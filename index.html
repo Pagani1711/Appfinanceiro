@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Contas 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#2E3648;
+    --navy-mid:#3E4759;
+    --cream:#F7F6F2;
+    --white:#FFFEFB;
+    --ink:#2E3648;
+    --ink-soft:#8A8F9C;
+    --green:#6E9B7B;
+    --terracota:#B5645A;
+    --gold:#B9A06B;
+    --gold-soft:#F0EBDD;
+    --line:#E8E6DF;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; background:var(--navy);}
+  body{
+    font-family:'Jost',sans-serif; color:var(--ink);
+    max-width:480px; margin:0 auto; background:var(--cream);
+    min-height:100vh; position:relative; padding-bottom:86px;
+  }
+  .mono{ font-family:'IBM Plex Mono',monospace; }
+  header.app-header{
+    background:var(--navy); color:#fff; padding:22px 20px 26px;
+  }
+  .eyebrow{ font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:#B6BBCE; margin:0 0 6px;}
+  h1.page-title{ font-family:'Jost',sans-serif; font-weight:600; font-size:24px; margin:0;}
+  .header-sub{ font-size:11.5px; color:#B6BBCE; margin-top:4px;}
+  .big-value{ font-family:'IBM Plex Mono',monospace; font-weight:500; font-size:27px; margin-top:6px;}
+
+  main{ padding:18px 18px 24px; }
+  .view{ display:none; }
+  .view.active{ display:block; }
+
+  .section-title{
+    font-size:11.5px; letter-spacing:.07em; text-transform:uppercase; color:var(--ink-soft);
+    font-weight:500; margin:18px 2px 10px;
+  }
+  .card{
+    background:var(--white); border:1px solid var(--line); border-radius:14px;
+    padding:16px; margin-bottom:12px;
+  }
+  .row-between{ display:flex; justify-content:space-between; align-items:flex-start; }
+  .muted{ color:var(--ink-soft); font-size:11.5px; }
+  .value{ font-family:'IBM Plex Mono',monospace; font-weight:500; font-size:16px; }
+
+  .btn{
+    border:none; border-radius:12px; padding:13px 18px; font-family:'Jost',sans-serif;
+    font-weight:600; font-size:14px; cursor:pointer;
+  }
+  .btn-primary{ background:var(--navy); color:#fff; width:100%; }
+  .btn-outline{ background:#fff; border:1px solid var(--gold); color:var(--gold); width:100%; }
+  .btn-outline.small{ padding:10px; font-size:12.5px; }
+  .btn-row{ display:flex; gap:10px; }
+  .btn-row .btn{ flex:1; }
+
+  .empty-hint{ color:var(--ink-soft); font-size:12.5px; padding:14px 2px; text-align:center; }
+
+  .conta-card .barra{ height:6px; border-radius:99px; background:var(--gold-soft); margin-top:10px; overflow:hidden;}
+  .conta-card .barra-fill{ height:100%; background:var(--gold); }
+
+  .despesa-item{
+    background:var(--white); border:1px solid var(--line); border-radius:12px;
+    padding:12px 14px; margin-bottom:10px; display:flex; align-items:center; gap:12px;
+  }
+  .despesa-item.paga{ opacity:.55; }
+  .check{
+    width:24px; height:24px; border-radius:50%; border:2px solid var(--line);
+    flex-shrink:0; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .check.on{ background:var(--green); border-color:var(--green); color:#fff; font-size:13px;}
+  .despesa-info{ flex:1; min-width:0; }
+  .despesa-nome{ font-weight:500; font-size:14px; }
+  .despesa-sub{ font-size:11px; color:var(--ink-soft); margin-top:2px;}
+  .despesa-valor{ font-family:'IBM Plex Mono',monospace; font-size:14px; white-space:nowrap; }
+  .despesa-valor.fixa{ color:var(--terracota); }
+  .despesa-valor.variavel{ color:var(--navy-mid); }
+  .del-btn{ background:none; border:none; color:var(--ink-soft); font-size:15px; cursor:pointer; padding:4px; }
+
+  .month-switch{ display:flex; align-items:center; justify-content:center; gap:16px; margin:6px 0 4px; }
+  .month-switch button{ background:none; border:none; font-size:18px; color:var(--ink-soft); cursor:pointer; padding:4px 10px;}
+  .month-switch .label{ font-weight:600; font-size:14px; min-width:120px; text-align:center; }
+
+  /* bottom nav */
+  nav.bottom-nav{
+    position:fixed; bottom:0; left:50%; transform:translateX(-50%);
+    width:100%; max-width:480px; background:var(--white); border-top:1px solid var(--line);
+    display:flex; z-index:50;
+  }
+  nav.bottom-nav button{
+    flex:1; background:none; border:none; padding:10px 4px 12px; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; gap:5px; color:var(--ink-soft);
+    font-family:'Jost',sans-serif; font-size:10.3px;
+  }
+  nav.bottom-nav button.active{ color:var(--navy); font-weight:600; }
+  nav.bottom-nav svg{ width:19px; height:19px; }
+
+  /* sheet / modal form */
+  .overlay{
+    position:fixed; inset:0; background:rgba(46,54,72,.35); z-index:100;
+    display:none; align-items:flex-end; justify-content:center;
+  }
+  .overlay.open{ display:flex; }
+  .sheet{
+    background:var(--cream); width:100%; max-width:480px; border-radius:22px 22px 0 0;
+    max-height:88vh; overflow-y:auto; padding-bottom:26px;
+  }
+  .sheet-header{
+    background:var(--navy); color:#fff; padding:18px 20px 20px;
+    display:flex; align-items:center; gap:14px; border-radius:22px 22px 0 0;
+  }
+  .sheet-header button{ background:rgba(255,255,255,.14); border:none; color:#fff; width:30px; height:30px; border-radius:50%; font-size:15px; cursor:pointer;}
+  .sheet-header h2{ font-size:17px; margin:0; font-weight:600; }
+  form{ padding:20px; }
+  .campo{ margin-bottom:16px; }
+  .campo label{ display:block; font-size:10.8px; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-soft); font-weight:600; margin-bottom:6px;}
+  .campo input, .campo select{
+    width:100%; border:1px solid var(--line); background:#fff; border-radius:11px;
+    padding:12px 13px; font-family:'Jost',sans-serif; font-size:14.5px; color:var(--ink);
+  }
+  .seg{ display:flex; gap:8px; }
+  .seg button{
+    flex:1; padding:11px; border-radius:11px; border:1px solid var(--line); background:#fff;
+    font-size:13px; font-weight:600; color:var(--ink-soft); cursor:pointer; font-family:'Jost',sans-serif;
+  }
+  .seg button.active{ background:var(--navy); color:#fff; border-color:var(--navy); }
+
+  .toast{
+    position:fixed; bottom:96px; left:50%; transform:translateX(-50%);
+    background:var(--ink); color:#fff; padding:10px 18px; border-radius:99px; font-size:12.5px;
+    z-index:200; opacity:0; pointer-events:none; transition:opacity .25s;
+  }
+  .toast.show{ opacity:1; }
+</style>
+</head>
+<body>
+
+<!-- ===== HOME ===== -->
+<section id="view-home" class="view active">
+  <header class="app-header">
+    <p class="eyebrow" id="home-date">—</p>
+    <h1 class="page-title" id="home-greeting">Olá</h1>
+    <p class="header-sub">SALDO PROJETADO DO MÊS</p>
+    <p class="big-value" id="home-saldo-projetado">R$ 0,00</p>
+    <p class="header-sub" id="home-entradas-saidas">Entradas R$ 0,00 · Saídas R$ 0,00 previstas</p>
+  </header>
+  <main>
+    <div class="section-title">Contas pagas no mês</div>
+    <div class="card row-between">
+      <div>
+        <div class="value" id="home-contas-pagas">0/0 pagas</div>
+        <div class="muted" style="margin-top:6px" id="home-falta-pagar">Nenhuma despesa cadastrada ainda</div>
+      </div>
+    </div>
+
+    <div class="section-title">Próximos vencimentos</div>
+    <div id="home-vencimentos"><p class="empty-hint">Nada por aqui ainda</p></div>
+  </main>
+</section>
+
+<!-- ===== CONTAS ===== -->
+<section id="view-contas" class="view">
+  <header class="app-header">
+    <p class="eyebrow">CONTAS</p>
+    <h1 class="page-title">Minhas Contas</h1>
+    <p class="header-sub">DISPONÍVEL TOTAL (SALDO + LIMITE)</p>
+    <p class="big-value" id="contas-disponivel-total">R$ 0,00</p>
+  </header>
+  <main>
+    <div class="section-title">Cadastradas</div>
+    <div id="lista-contas"><p class="empty-hint">Nenhuma conta cadastrada ainda</p></div>
+    <button class="btn btn-outline" onclick="abrirFormConta()">+ &nbsp;Nova conta</button>
+
+    <div class="section-title" style="margin-top:26px">Despesas</div>
+    <div class="month-switch">
+      <button onclick="mudarMes(-1)">‹</button>
+      <span class="label" id="mes-label">—</span>
+      <button onclick="mudarMes(1)">›</button>
+    </div>
+    <div id="lista-despesas"><p class="empty-hint">Nenhuma despesa neste mês</p></div>
+    <button class="btn btn-primary" onclick="abrirFormDespesa()">+ &nbsp;Nova despesa</button>
+  </main>
+</section>
+
+<!-- ===== INVESTIMENTOS (placeholder) ===== -->
+<section id="view-investimentos" class="view">
+  <header class="app-header">
+    <p class="eyebrow">INVESTIMENTOS</p>
+    <h1 class="page-title">Investimentos</h1>
+  </header>
+  <main>
+    <p class="empty-hint">Este módulo ainda está em construção — chega na próxima etapa.</p>
+  </main>
+</section>
+
+<!-- ===== CARTÕES (placeholder) ===== -->
+<section id="view-cartoes" class="view">
+  <header class="app-header">
+    <p class="eyebrow">CARTÕES</p>
+    <h1 class="page-title">Cartões</h1>
+  </header>
+  <main>
+    <p class="empty-hint">Este módulo ainda está em construção — chega na próxima etapa.</p>
+  </main>
+</section>
+
+<!-- ===== BOTTOM NAV ===== -->
+<nav class="bottom-nav">
+  <button data-view="home" class="active" onclick="mudarView('home')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 11L12 4l8 7"/><path d="M6 10v9h12v-9"/><path d="M10 19v-5h4v5"/></svg>
+    Início
+  </button>
+  <button data-view="contas" onclick="mudarView('contas')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18"/><circle cx="16.5" cy="14.3" r="1.6"/></svg>
+    Contas
+  </button>
+  <button data-view="investimentos" onclick="mudarView('investimentos')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19h3v-6H4v6zm6.5 0h3V9h-3v10zM17 19h3V5h-3v14z"/></svg>
+    Investimentos
+  </button>
+  <button data-view="cartoes" onclick="mudarView('cartoes')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5.5" width="18" height="13" rx="2.2"/><path d="M3 9.5h18"/><path d="M6.5 14.5h4"/></svg>
+    Cartões
+  </button>
+</nav>
+
+<!-- ===== FORM: NOVA CONTA ===== -->
+<div class="overlay" id="overlay-conta">
+  <div class="sheet">
+    <div class="sheet-header">
+      <button onclick="fecharForm('overlay-conta')">←</button>
+      <h2>Nova conta corrente</h2>
+    </div>
+    <form id="form-conta" onsubmit="salvarConta(event)">
+      <div class="campo">
+        <label>Nome da conta</label>
+        <input type="text" id="conta-nome" placeholder="Ex: Nubank, Bradesco..." required>
+      </div>
+      <div class="campo">
+        <label>Saldo atual</label>
+        <input type="number" step="0.01" id="conta-saldo" placeholder="0,00" required>
+      </div>
+      <div class="campo">
+        <label>Tem limite de cheque especial?</label>
+        <div class="seg">
+          <button type="button" class="active" data-val="sim" onclick="toggleSeg(this)">Sim</button>
+          <button type="button" data-val="nao" onclick="toggleSeg(this)">Não</button>
+        </div>
+        <input type="hidden" id="conta-tem-limite" value="sim">
+      </div>
+      <div class="campo">
+        <label>Valor do limite</label>
+        <input type="number" step="0.01" id="conta-limite" placeholder="0,00">
+      </div>
+      <button class="btn btn-primary" type="submit">Salvar conta</button>
+    </form>
+  </div>
+</div>
+
+<!-- ===== FORM: NOVA DESPESA ===== -->
+<div class="overlay" id="overlay-despesa">
+  <div class="sheet">
+    <div class="sheet-header">
+      <button onclick="fecharForm('overlay-despesa')">←</button>
+      <h2>Nova despesa</h2>
+    </div>
+    <form id="form-despesa" onsubmit="salvarDespesa(event)">
+      <div class="campo">
+        <label>Nome da despesa</label>
+        <input type="text" id="despesa-nome" placeholder="Ex: Internet, Mercado..." required>
+      </div>
+      <div class="campo">
+        <label>Valor</label>
+        <input type="number" step="0.01" id="despesa-valor" placeholder="0,00" required>
+      </div>
+      <div class="campo">
+        <label>Categoria</label>
+        <select id="despesa-categoria">
+          <option>Alimentação/Restaurante</option>
+          <option>Padaria/Mercado</option>
+          <option>Farmácia/Saúde</option>
+          <option>Academia/Bem-estar</option>
+          <option>Lavanderia/Serviços</option>
+          <option>Viagem/Hospedagem</option>
+          <option>Compras Online</option>
+          <option>Assinaturas</option>
+          <option>Transporte/Auto</option>
+          <option>Vestuário/Beleza</option>
+          <option>Transferência Pessoal</option>
+          <option>Pet</option>
+          <option>Reembolsável Trabalho</option>
+          <option>Outros</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label>Conta vinculada</label>
+        <select id="despesa-conta"></select>
+      </div>
+      <div class="campo">
+        <label>Tipo de despesa</label>
+        <div class="seg">
+          <button type="button" class="active" data-val="Fixa" onclick="toggleSeg(this)">Fixa</button>
+          <button type="button" data-val="Variável" onclick="toggleSeg(this)">Variável</button>
+        </div>
+        <input type="hidden" id="despesa-tipo" value="Fixa">
+      </div>
+      <div class="campo">
+        <label>Data de vencimento</label>
+        <input type="date" id="despesa-vencimento" required>
+      </div>
+      <button class="btn btn-primary" type="submit">Salvar despesa</button>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import {
+  getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc,
+  query, orderBy, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyB9Tf2AHgVoP7Eg-Pim0mDkjuaLCQONGV4",
+  authDomain: "assistente-financeiro-efd39.firebaseapp.com",
+  projectId: "assistente-financeiro-efd39",
+  storageBucket: "assistente-financeiro-efd39.firebasestorage.app",
+  messagingSenderId: "105143129543",
+  appId: "1:105143129543:web:142fd2f0c0a1d1771eb5e2"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+let contas = [];
+let despesas = [];
+let mesAtual = new Date(); // mês sendo visualizado na aba Contas
+
+// ---------- Navegação ----------
+window.mudarView = function(nome){
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-'+nome).classList.add('active');
+  document.querySelectorAll('.bottom-nav button').forEach(b => b.classList.toggle('active', b.dataset.view === nome));
+};
+
+window.toggleSeg = function(btn){
+  const group = btn.parentElement;
+  group.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const hidden = group.nextElementSibling;
+  if (hidden && hidden.tagName === 'INPUT') hidden.value = btn.dataset.val;
+};
+
+window.abrirFormConta = function(){ document.getElementById('overlay-conta').classList.add('open'); };
+window.abrirFormDespesa = function(){
+  preencherSelectContas();
+  document.getElementById('overlay-despesa').classList.add('open');
+};
+window.fecharForm = function(id){ document.getElementById(id).classList.remove('open'); };
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=> t.classList.remove('show'), 2200);
+}
+
+function brl(v){
+  const sign = v < 0 ? "-" : "";
+  return sign + "R$ " + Math.abs(v).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+// ---------- Contas ----------
+window.salvarConta = async function(e){
+  e.preventDefault();
+  const nome = document.getElementById('conta-nome').value.trim();
+  const saldo = parseFloat(document.getElementById('conta-saldo').value || 0);
+  const temLimite = document.getElementById('conta-tem-limite').value === 'sim';
+  const limite = temLimite ? parseFloat(document.getElementById('conta-limite').value || 0) : 0;
+  try{
+    await addDoc(collection(db, 'contas'), { nome, saldo, temLimite, limite, criadoEm: serverTimestamp() });
+    toast('Conta salva!');
+    document.getElementById('form-conta').reset();
+    fecharForm('overlay-conta');
+  }catch(err){
+    console.error(err);
+    toast('Erro ao salvar. Veja o console.');
+  }
+};
+
+function renderContas(){
+  const el = document.getElementById('lista-contas');
+  if (contas.length === 0){
+    el.innerHTML = '<p class="empty-hint">Nenhuma conta cadastrada ainda</p>';
+  } else {
+    el.innerHTML = contas.map(c => {
+      const disponivel = (c.saldo||0) + (c.temLimite ? (c.limite||0) : 0);
+      const usoLimite = c.temLimite && c.limite > 0 ? Math.min(1, Math.max(0, 1 - (c.saldo/ (c.saldo+c.limite)))) : 0;
+      return `
+      <div class="card conta-card">
+        <div class="row-between">
+          <div>
+            <div style="font-weight:600;font-size:15px">${c.nome}</div>
+            <div class="muted">Conta corrente</div>
+          </div>
+          <button class="del-btn" onclick="excluirConta('${c.id}')">✕</button>
+        </div>
+        <div class="value" style="margin-top:10px">${brl(c.saldo||0)}</div>
+        ${c.temLimite ? `
+          <div class="barra"><div class="barra-fill" style="width:${usoLimite*100}%"></div></div>
+          <div class="muted" style="margin-top:6px">Limite de cheque especial: ${brl(c.limite||0)}</div>
+        ` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  const totalDisponivel = contas.reduce((s,c)=> s + (c.saldo||0) + (c.temLimite ? (c.limite||0) : 0), 0);
+  document.getElementById('contas-disponivel-total').textContent = brl(totalDisponivel);
+}
+
+window.excluirConta = async function(id){
+  if (!confirm('Excluir esta conta?')) return;
+  await deleteDoc(doc(db, 'contas', id));
+  toast('Conta excluída');
+};
+
+function preencherSelectContas(){
+  const sel = document.getElementById('despesa-conta');
+  sel.innerHTML = contas.map(c => `<option value="${c.id}">${c.nome}</option>`).join('') || '<option value="">Nenhuma conta cadastrada</option>';
+}
+
+// ---------- Despesas ----------
+window.salvarDespesa = async function(e){
+  e.preventDefault();
+  const nome = document.getElementById('despesa-nome').value.trim();
+  const valor = parseFloat(document.getElementById('despesa-valor').value || 0);
+  const categoria = document.getElementById('despesa-categoria').value;
+  const contaId = document.getElementById('despesa-conta').value;
+  const contaObj = contas.find(c => c.id === contaId);
+  const tipo = document.getElementById('despesa-tipo').value;
+  const vencimento = document.getElementById('despesa-vencimento').value; // YYYY-MM-DD
+  try{
+    await addDoc(collection(db, 'despesas'), {
+      nome, valor, categoria, contaId, contaNome: contaObj ? contaObj.nome : '',
+      tipo, vencimento, pago:false, criadoEm: serverTimestamp()
+    });
+    toast('Despesa salva!');
+    document.getElementById('form-despesa').reset();
+    fecharForm('overlay-despesa');
+  }catch(err){
+    console.error(err);
+    toast('Erro ao salvar. Veja o console.');
+  }
+};
+
+window.togglePago = async function(id, atual){
+  await updateDoc(doc(db, 'despesas', id), { pago: !atual });
+};
+
+window.excluirDespesa = async function(id){
+  if (!confirm('Excluir esta despesa?')) return;
+  await deleteDoc(doc(db, 'despesas', id));
+  toast('Despesa excluída');
+};
+
+window.mudarMes = function(delta){
+  mesAtual.setMonth(mesAtual.getMonth() + delta);
+  mesAtual = new Date(mesAtual);
+  renderDespesas();
+};
+
+function mesChave(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
+
+const NOMES_MES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+function renderDespesas(){
+  document.getElementById('mes-label').textContent = NOMES_MES[mesAtual.getMonth()] + '/' + mesAtual.getFullYear();
+  const chave = mesChave(mesAtual);
+  const doMes = despesas.filter(d => (d.vencimento||'').startsWith(chave)).sort((a,b)=> (a.vencimento||'').localeCompare(b.vencimento||''));
+
+  const el = document.getElementById('lista-despesas');
+  if (doMes.length === 0){
+    el.innerHTML = '<p class="empty-hint">Nenhuma despesa neste mês</p>';
+  } else {
+    el.innerHTML = doMes.map(d => `
+      <div class="despesa-item ${d.pago ? 'paga' : ''}">
+        <div class="check ${d.pago ? 'on' : ''}" onclick="togglePago('${d.id}', ${d.pago})">${d.pago ? '✓' : ''}</div>
+        <div class="despesa-info">
+          <div class="despesa-nome">${d.nome}</div>
+          <div class="despesa-sub">${d.categoria} · ${d.contaNome || 'sem conta'} · vence ${formatarData(d.vencimento)}</div>
+        </div>
+        <div class="despesa-valor ${d.tipo === 'Fixa' ? 'fixa' : 'variavel'}">${brl(d.valor||0)}</div>
+        <button class="del-btn" onclick="excluirDespesa('${d.id}')">✕</button>
+      </div>
+    `).join('');
+  }
+
+  renderHome(); // home depende do estado global de despesas/contas também
+}
+
+function formatarData(iso){
+  if (!iso) return '—';
+  const [y,m,dd] = iso.split('-');
+  return `${dd}/${m}`;
+}
+
+// ---------- Home ----------
+function renderHome(){
+  const hoje = new Date();
+  document.getElementById('home-date').textContent = hoje.toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long' }).toUpperCase();
+  document.getElementById('home-greeting').textContent = saudacao() + ', Fernando';
+
+  const chaveMesAtualReal = mesChave(new Date());
+  const doMesReal = despesas.filter(d => (d.vencimento||'').startsWith(chaveMesAtualReal));
+  const totalSaidas = doMesReal.reduce((s,d)=> s + (d.valor||0), 0);
+  const saldoContas = contas.reduce((s,c)=> s + (c.saldo||0), 0);
+  // "Entradas" não tem cadastro próprio ainda neste MVP — usamos o saldo das contas como base do saldo projetado.
+  const saldoProjetado = saldoContas - doMesReal.filter(d=>!d.pago).reduce((s,d)=>s+(d.valor||0),0);
+
+  document.getElementById('home-saldo-projetado').textContent = brl(saldoProjetado);
+  document.getElementById('home-entradas-saidas').textContent = `Saldo em contas ${brl(saldoContas)} · Saídas do mês ${brl(totalSaidas)}`;
+
+  const pagas = doMesReal.filter(d=>d.pago).length;
+  document.getElementById('home-contas-pagas').textContent = `${pagas}/${doMesReal.length} pagas`;
+  const faltaPagar = doMesReal.filter(d=>!d.pago).reduce((s,d)=>s+(d.valor||0),0);
+  document.getElementById('home-falta-pagar').textContent = doMesReal.length
+    ? `Faltam ${doMesReal.length - pagas} · ${brl(faltaPagar)} ainda a pagar este mês`
+    : 'Nenhuma despesa cadastrada ainda';
+
+  const proximas = doMesReal.filter(d=>!d.pago).sort((a,b)=>(a.vencimento||'').localeCompare(b.vencimento||'')).slice(0,4);
+  const elV = document.getElementById('home-vencimentos');
+  elV.innerHTML = proximas.length ? proximas.map(d => `
+    <div class="despesa-item">
+      <div class="despesa-info">
+        <div class="despesa-nome">${d.nome}</div>
+        <div class="despesa-sub">${d.categoria} · vence ${formatarData(d.vencimento)}</div>
+      </div>
+      <div class="despesa-valor ${d.tipo==='Fixa'?'fixa':'variavel'}">${brl(d.valor||0)}</div>
+    </div>
+  `).join('') : '<p class="empty-hint">Nada por aqui ainda</p>';
+}
+
+function saudacao(){
+  const h = new Date().getHours();
+  if (h < 12) return 'Bom dia';
+  if (h < 18) return 'Boa tarde';
+  return 'Boa noite';
+}
+
+// ---------- Firestore listeners ----------
+onSnapshot(query(collection(db, 'contas'), orderBy('criadoEm','asc')), snap => {
+  contas = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+  renderContas();
+  renderDespesas();
+});
+
+onSnapshot(query(collection(db, 'despesas'), orderBy('vencimento','asc')), snap => {
+  despesas = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+  renderDespesas();
+});
+
+renderDespesas();
+</script>
+</body>
+</html>
