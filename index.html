@@ -920,10 +920,12 @@ window.registrarRendimento = async function(investId, contaId, contaNome){
   }
 };
 
-// Busca a cotação de uma ação/FII via brapi.dev (best effort — API pública gratuita, pode falhar ou exigir token no futuro)
+const BRAPI_TOKEN = 'w9von59JFUm4uJJWywYBHz';
+
+// Busca a cotação de uma ação/FII via brapi.dev (com token gratuito)
 async function buscarCotacaoAcaoFii(investId, ticker){
   try{
-    const resp = await fetch(`https://brapi.dev/api/quote/${ticker}`);
+    const resp = await fetch(`https://brapi.dev/api/quote/${ticker}?token=${BRAPI_TOKEN}`);
     if (!resp.ok) throw new Error('HTTP '+resp.status);
     const json = await resp.json();
     const preco = json?.results?.[0]?.regularMarketPrice;
