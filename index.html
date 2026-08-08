@@ -426,11 +426,27 @@
       <div id="inv-bloco-rendafixa">
         <div class="campo">
           <label>Modalidade</label>
-          <div class="seg">
-            <button type="button" class="active" data-val="Pré-fixado" onclick="toggleModalidade(this)">Pré-fixado</button>
-            <button type="button" data-val="Pós-fixado" onclick="toggleModalidade(this)">Pós-fixado</button>
-          </div>
-          <input type="hidden" id="inv-modalidade" value="Pré-fixado">
+          <select id="inv-modalidade" onchange="aplicarModalidadeVisual(this.value)">
+            <option>Pré-fixado</option>
+            <option>Pós-fixado (CDI)</option>
+            <option>IPCA+</option>
+            <option>Fundo DI</option>
+            <option>Fundo Multimercado</option>
+            <option>Outro</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="inv-bloco-rendavariavel" style="display:none">
+        <div class="campo">
+          <label>Segmento</label>
+          <select id="inv-segmento-rv">
+            <option>Ações</option>
+            <option>FIIs</option>
+            <option>ETFs</option>
+            <option>BDRs</option>
+            <option>Outro</option>
+          </select>
         </div>
       </div>
 
@@ -521,20 +537,22 @@ window.toggleTipoInvestimento = function(btn){
   toggleSeg(btn);
   const tipo = btn.dataset.val;
   const rfBloco = document.getElementById('inv-bloco-rendafixa');
-  const modalidade = document.getElementById('inv-modalidade').value;
+  const rvBloco = document.getElementById('inv-bloco-rendavariavel');
   if (tipo === 'Renda Fixa'){
     rfBloco.style.display = '';
-    aplicarModalidadeVisual(modalidade);
+    rvBloco.style.display = 'none';
+    aplicarModalidadeVisual(document.getElementById('inv-modalidade').value);
+  } else if (tipo === 'Renda Variável'){
+    rfBloco.style.display = 'none';
+    rvBloco.style.display = '';
+    document.getElementById('inv-bloco-prefixado').style.display = 'none';
+    document.getElementById('inv-bloco-manual').style.display = '';
   } else {
     rfBloco.style.display = 'none';
+    rvBloco.style.display = 'none';
     document.getElementById('inv-bloco-prefixado').style.display = 'none';
     document.getElementById('inv-bloco-manual').style.display = '';
   }
-};
-
-window.toggleModalidade = function(btn){
-  toggleSeg(btn);
-  aplicarModalidadeVisual(btn.dataset.val);
 };
 
 function aplicarModalidadeVisual(modalidade){
@@ -543,6 +561,7 @@ function aplicarModalidadeVisual(modalidade){
   if (modalidade === 'Pré-fixado'){ pre.style.display=''; man.style.display='none'; }
   else { pre.style.display='none'; man.style.display=''; }
 }
+window.aplicarModalidadeVisual = aplicarModalidadeVisual;
 
 function toast(msg){
   const t = document.getElementById('toast');
@@ -716,6 +735,9 @@ window.salvarInvestimento = async function(e){
     } else {
       dados.valorManual = parseFloat(document.getElementById('inv-valor-manual').value || 0);
     }
+  } else if (tipo === 'Renda Variável'){
+    dados.segmento = document.getElementById('inv-segmento-rv').value;
+    dados.valorManual = parseFloat(document.getElementById('inv-valor-manual').value || 0);
   } else {
     dados.valorManual = parseFloat(document.getElementById('inv-valor-manual').value || 0);
   }
@@ -785,7 +807,7 @@ function renderInvestimentos(){
           <div class="despesa-item" style="margin-top:10px">
             <div class="despesa-info">
               <div class="despesa-nome">${inv.nomeAtivo}</div>
-              <div class="despesa-sub">${inv.tipo}${inv.modalidade ? ' · '+inv.modalidade : ''}</div>
+              <div class="despesa-sub">${inv.tipo}${inv.modalidade ? ' · '+inv.modalidade : ''}${inv.segmento ? ' · '+inv.segmento : ''}</div>
             </div>
             <div class="despesa-valor" style="color:${CORES_SEGMENTO[segmentoDe(inv)]}">${brl(valorAtualInvestimento(inv))}</div>
             <button class="del-btn" onclick="excluirInvestimento('${inv.id}')">✕</button>
