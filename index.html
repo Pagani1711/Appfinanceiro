@@ -412,7 +412,7 @@
   <div class="sheet">
     <div class="sheet-header">
       <button onclick="fecharForm('overlay-investimento')">←</button>
-      <h2>Nova posição</h2>
+      <h2 id="inv-sheet-title">Nova posição</h2>
     </div>
     <form id="form-investimento" onsubmit="salvarInvestimento(event)">
       <div class="campo">
@@ -477,6 +477,38 @@
         <div class="hint muted" style="margin:-8px 2px 16px">Tentamos buscar a cotação atual automaticamente. Se não conseguirmos, usamos o preço médio até a próxima atualização.</div>
       </div>
 
+      <div id="inv-bloco-cripto" style="display:none">
+        <div class="campo">
+          <label>Símbolo</label>
+          <select id="inv-cripto-simbolo">
+            <option value="BTC">Bitcoin (BTC)</option>
+            <option value="ETH">Ethereum (ETH)</option>
+            <option value="SOL">Solana (SOL)</option>
+            <option value="BNB">BNB</option>
+            <option value="XRP">XRP</option>
+            <option value="ADA">Cardano (ADA)</option>
+            <option value="DOGE">Dogecoin (DOGE)</option>
+            <option value="MATIC">Polygon (MATIC)</option>
+            <option value="DOT">Polkadot (DOT)</option>
+            <option value="LTC">Litecoin (LTC)</option>
+            <option value="LINK">Chainlink (LINK)</option>
+            <option value="AVAX">Avalanche (AVAX)</option>
+            <option value="TRX">Tron (TRX)</option>
+            <option value="USDT">Tether (USDT)</option>
+            <option value="OUTRO">Outra (sem atualização automática)</option>
+          </select>
+        </div>
+        <div class="campo">
+          <label>Quantidade</label>
+          <input type="number" step="0.00000001" id="inv-cripto-quantidade" placeholder="Ex: 0,015">
+        </div>
+        <div class="campo">
+          <label>Preço médio de compra (R$ por unidade)</label>
+          <input type="number" step="0.01" id="inv-cripto-preco-medio" placeholder="0,00">
+        </div>
+        <div class="hint muted" style="margin:-8px 2px 16px">Moedas da lista atualizam sozinhas. "Outra" fica no preço médio até você editar manualmente.</div>
+      </div>
+
       <div id="inv-bloco-prefixado">
         <div class="campo">
           <label>Valor investido</label>
@@ -505,7 +537,7 @@
         <div class="hint muted" style="margin:-8px 2px 16px">Esse tipo ainda não atualiza sozinho — edite quando o valor mudar.</div>
       </div>
 
-      <button class="btn btn-primary" type="submit">Salvar posição</button>
+      <button class="btn btn-primary" type="submit" id="inv-submit-btn">Salvar posição</button>
     </form>
   </div>
 </div>
@@ -558,9 +590,56 @@ window.abrirFormDespesa = function(){
 };
 window.fecharForm = function(id){ document.getElementById(id).classList.remove('open'); };
 
-window.abrirFormInvestimento = function(){
+let investimentoEditandoId = null;
+
+window.abrirFormInvestimento = function(id){
   const sel = document.getElementById('inv-conta-rendimento');
   sel.innerHTML = contas.map(c => `<option value="${c.id}">${c.nome}</option>`).join('') || '<option value="">Nenhuma conta cadastrada</option>';
+
+  document.getElementById('form-investimento').reset();
+  investimentoEditandoId = id || null;
+
+  if (id){
+    const inv = investimentos.find(i => i.id === id);
+    if (!inv) return;
+    document.getElementById('inv-sheet-title').textContent = 'Editar posição';
+    document.getElementById('inv-submit-btn').textContent = 'Salvar alterações';
+    document.getElementById('inv-instituicao').value = inv.instituicao || '';
+    document.getElementById('inv-nome').value = inv.nomeAtivo || '';
+    // seleciona o tipo certo no seg control
+    document.querySelectorAll('#form-investimento .seg [data-val]').forEach(b=>{});
+    const tipoBtn = document.querySelector(`[onclick="toggleTipoInvestimento(this)"][data-val="${inv.tipo}"]`);
+    if (tipoBtn) toggleTipoInvestimento(tipoBtn);
+    document.getElementById('inv-tipo').value = inv.tipo;
+
+    if (inv.tipo === 'Renda Fixa'){
+      document.getElementById('inv-modalidade').value = inv.modalidade || 'Pré-fixado';
+      aplicarModalidadeVisual(inv.modalidade);
+      document.getElementById('inv-valor-investido').value = inv.valorInvestido || '';
+      document.getElementById('inv-taxa').value = inv.taxaAnual || '';
+      document.getElementById('inv-data-inicio').value = inv.dataInicio || '';
+      document.getElementById('inv-data-fim').value = inv.dataFim || '';
+      document.getElementById('inv-valor-manual').value = inv.valorManual || '';
+    } else if (inv.tipo === 'Renda Variável'){
+      document.getElementById('inv-segmento-rv').value = inv.segmento || 'Ações';
+      document.getElementById('inv-ticker').value = inv.ticker || '';
+      document.getElementById('inv-quantidade').value = inv.quantidade || '';
+      document.getElementById('inv-preco-medio').value = inv.precoMedio || '';
+      if (inv.contaRendimentoId) sel.value = inv.contaRendimentoId;
+    } else if (inv.tipo === 'Cripto'){
+      document.getElementById('inv-cripto-simbolo').value = inv.simbolo || 'BTC';
+      document.getElementById('inv-cripto-quantidade').value = inv.quantidade || '';
+      document.getElementById('inv-cripto-preco-medio').value = inv.precoMedio || '';
+    } else {
+      document.getElementById('inv-valor-manual').value = inv.valorManual || '';
+    }
+  } else {
+    document.getElementById('inv-sheet-title').textContent = 'Nova posição';
+    document.getElementById('inv-submit-btn').textContent = 'Salvar posição';
+    const tipoBtn = document.querySelector('[onclick="toggleTipoInvestimento(this)"][data-val="Renda Fixa"]');
+    if (tipoBtn) toggleTipoInvestimento(tipoBtn);
+  }
+
   document.getElementById('overlay-investimento').classList.add('open');
 };
 
@@ -569,19 +648,21 @@ window.toggleTipoInvestimento = function(btn){
   const tipo = btn.dataset.val;
   const rfBloco = document.getElementById('inv-bloco-rendafixa');
   const rvBloco = document.getElementById('inv-bloco-rendavariavel');
+  const criptoBloco = document.getElementById('inv-bloco-cripto');
+  rfBloco.style.display = 'none';
+  rvBloco.style.display = 'none';
+  criptoBloco.style.display = 'none';
+  document.getElementById('inv-bloco-prefixado').style.display = 'none';
+  document.getElementById('inv-bloco-manual').style.display = 'none';
+
   if (tipo === 'Renda Fixa'){
     rfBloco.style.display = '';
-    rvBloco.style.display = 'none';
     aplicarModalidadeVisual(document.getElementById('inv-modalidade').value);
   } else if (tipo === 'Renda Variável'){
-    rfBloco.style.display = 'none';
     rvBloco.style.display = '';
-    document.getElementById('inv-bloco-prefixado').style.display = 'none';
-    document.getElementById('inv-bloco-manual').style.display = '';
+  } else if (tipo === 'Cripto'){
+    criptoBloco.style.display = '';
   } else {
-    rfBloco.style.display = 'none';
-    rvBloco.style.display = 'none';
-    document.getElementById('inv-bloco-prefixado').style.display = 'none';
     document.getElementById('inv-bloco-manual').style.display = '';
   }
 };
@@ -753,7 +834,12 @@ window.salvarInvestimento = async function(e){
   const instituicao = document.getElementById('inv-instituicao').value.trim();
   const nomeAtivo = document.getElementById('inv-nome').value.trim();
   const tipo = document.getElementById('inv-tipo').value;
-  const dados = { instituicao, nomeAtivo, tipo, criadoEm: serverTimestamp() };
+  const dados = { instituicao, nomeAtivo, tipo };
+  const editando = !!investimentoEditandoId;
+  const invAntiga = editando ? investimentos.find(i => i.id === investimentoEditandoId) : null;
+  if (!editando) dados.criadoEm = serverTimestamp();
+
+  let tickerMudou = false;
 
   if (tipo === 'Renda Fixa'){
     const modalidade = document.getElementById('inv-modalidade').value;
@@ -775,17 +861,36 @@ window.salvarInvestimento = async function(e){
     dados.precoMedio = parseFloat(document.getElementById('inv-preco-medio').value || 0);
     dados.contaRendimentoId = contaId;
     dados.contaRendimentoNome = contaObj ? contaObj.nome : '';
-    dados.valorMercado = null; // preenchido pela busca de cotação
+    tickerMudou = !invAntiga || invAntiga.ticker !== dados.ticker;
+    if (tickerMudou) dados.valorMercado = null;
+  } else if (tipo === 'Cripto'){
+    dados.simbolo = document.getElementById('inv-cripto-simbolo').value;
+    dados.quantidade = parseFloat(document.getElementById('inv-cripto-quantidade').value || 0);
+    dados.precoMedio = parseFloat(document.getElementById('inv-cripto-preco-medio').value || 0);
+    tickerMudou = !invAntiga || invAntiga.simbolo !== dados.simbolo;
+    if (tickerMudou) dados.valorMercado = null;
   } else {
     dados.valorManual = parseFloat(document.getElementById('inv-valor-manual').value || 0);
   }
 
   try{
-    const ref = await addDoc(collection(db, 'investimentos'), dados);
-    toast('Posição salva!');
+    let id;
+    if (editando){
+      await updateDoc(doc(db, 'investimentos', investimentoEditandoId), dados);
+      id = investimentoEditandoId;
+      toast('Posição atualizada!');
+    } else {
+      const ref = await addDoc(collection(db, 'investimentos'), dados);
+      id = ref.id;
+      toast('Posição salva!');
+    }
     document.getElementById('form-investimento').reset();
     fecharForm('overlay-investimento');
-    if (dados.ticker) buscarCotacaoUnica(ref.id, dados.ticker);
+    investimentoEditandoId = null;
+    if (tickerMudou){
+      if (dados.ticker) buscarCotacaoAcaoFii(id, dados.ticker);
+      if (dados.simbolo && dados.simbolo !== 'OUTRO') buscarCotacaoCripto(id, dados.simbolo);
+    }
   }catch(err){
     console.error(err);
     toast('Erro ao salvar. Veja o console.');
@@ -815,26 +920,61 @@ window.registrarRendimento = async function(investId, contaId, contaNome){
   }
 };
 
-// Busca a cotação de um ticker via brapi.dev (best effort — se falhar, mantemos o preço médio)
-async function buscarCotacaoUnica(investId, ticker){
+// Busca a cotação de uma ação/FII via brapi.dev (best effort — API pública gratuita, pode falhar ou exigir token no futuro)
+async function buscarCotacaoAcaoFii(investId, ticker){
   try{
     const resp = await fetch(`https://brapi.dev/api/quote/${ticker}`);
+    if (!resp.ok) throw new Error('HTTP '+resp.status);
     const json = await resp.json();
     const preco = json?.results?.[0]?.regularMarketPrice;
     if (typeof preco === 'number'){
       await updateDoc(doc(db, 'investimentos', investId), { valorMercado: preco, cotacaoAtualizadaEm: serverTimestamp() });
+      return true;
     }
+    throw new Error('Sem preço no retorno da API');
   }catch(err){
     console.warn('Não foi possível buscar cotação de', ticker, err);
+    return false;
+  }
+}
+
+const COINGECKO_IDS = {
+  BTC:'bitcoin', ETH:'ethereum', SOL:'solana', BNB:'binancecoin', XRP:'ripple',
+  ADA:'cardano', DOGE:'dogecoin', MATIC:'matic-network', DOT:'polkadot',
+  LTC:'litecoin', LINK:'chainlink', AVAX:'avalanche-2', TRX:'tron', USDT:'tether'
+};
+
+// Busca a cotação de uma cripto via CoinGecko (best effort)
+async function buscarCotacaoCripto(investId, simbolo){
+  const id = COINGECKO_IDS[simbolo];
+  if (!id) return false;
+  try{
+    const resp = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=brl`);
+    if (!resp.ok) throw new Error('HTTP '+resp.status);
+    const json = await resp.json();
+    const preco = json?.[id]?.brl;
+    if (typeof preco === 'number'){
+      await updateDoc(doc(db, 'investimentos', investId), { valorMercado: preco, cotacaoAtualizadaEm: serverTimestamp() });
+      return true;
+    }
+    throw new Error('Sem preço no retorno da API');
+  }catch(err){
+    console.warn('Não foi possível buscar cotação de', simbolo, err);
+    return false;
   }
 }
 
 window.atualizarCotacoes = async function(){
-  const comTicker = investimentos.filter(inv => inv.tipo === 'Renda Variável' && inv.ticker);
-  if (comTicker.length === 0){ toast('Nenhum ativo com ticker cadastrado'); return; }
+  const acoesFiis = investimentos.filter(inv => inv.tipo === 'Renda Variável' && inv.ticker);
+  const criptos = investimentos.filter(inv => inv.tipo === 'Cripto' && inv.simbolo && inv.simbolo !== 'OUTRO');
+  if (acoesFiis.length === 0 && criptos.length === 0){ toast('Nenhum ativo com ticker/símbolo pra atualizar'); return; }
   toast('Buscando cotações...');
-  await Promise.all(comTicker.map(inv => buscarCotacaoUnica(inv.id, inv.ticker)));
-  toast('Cotações atualizadas (o que não foi encontrado manteve o preço médio)');
+  const resultados = await Promise.all([
+    ...acoesFiis.map(inv => buscarCotacaoAcaoFii(inv.id, inv.ticker)),
+    ...criptos.map(inv => buscarCotacaoCripto(inv.id, inv.simbolo))
+  ]);
+  const falhas = resultados.filter(r => r === false).length;
+  toast(falhas === 0 ? 'Cotações atualizadas!' : `Atualizado — ${falhas} ativo(s) não encontrado(s), mantido o preço médio`);
 };
 
 // Calcula o valor atualizado de uma posição pré-fixada (juros compostos, mês a mês)
@@ -849,16 +989,20 @@ function valorAtualInvestimento(inv){
     const taxaMensal = Math.pow(1 + (inv.taxaAnual/100), 1/12) - 1;
     return (inv.valorInvestido||0) * Math.pow(1 + taxaMensal, meses);
   }
-  if (inv.tipo === 'Renda Variável' && inv.quantidade){
-    const precoUsado = (typeof inv.valorMercado === 'number') ? inv.valorMercado : (inv.precoMedio||0);
-    return inv.quantidade * precoUsado;
+  if ((inv.tipo === 'Renda Variável' || inv.tipo === 'Cripto') && inv.quantidade){
+    return inv.quantidade * precoUnitarioAtual(inv);
   }
   return inv.valorManual || 0;
 }
 
+// Preço por unidade (cota/ação/moeda) sendo usado agora — cotação de mercado se tiver, senão preço médio
+function precoUnitarioAtual(inv){
+  return (typeof inv.valorMercado === 'number') ? inv.valorMercado : (inv.precoMedio||0);
+}
+
 // Custo de aquisição (quantidade x preço médio) — usado pra calcular variação %
 function custoInvestimento(inv){
-  if (inv.tipo === 'Renda Variável' && inv.quantidade){
+  if ((inv.tipo === 'Renda Variável' || inv.tipo === 'Cripto') && inv.quantidade){
     return inv.quantidade * (inv.precoMedio||0);
   }
   return valorAtualInvestimento(inv);
@@ -871,6 +1015,13 @@ function segmentoDe(inv){
 }
 
 const CORES_SEGMENTO = { 'Renda Fixa':'#6E9B7B', 'Renda Variável':'#B5645A', 'Cripto':'#B9A06B' };
+let instituicoesExpandidas = new Set();
+
+window.toggleInstituicao = function(instituicao){
+  if (instituicoesExpandidas.has(instituicao)) instituicoesExpandidas.delete(instituicao);
+  else instituicoesExpandidas.add(instituicao);
+  renderInvestimentos();
+};
 
 function renderInvestimentos(){
   const listaEl = document.getElementById('lista-investimentos');
@@ -887,28 +1038,36 @@ function renderInvestimentos(){
     });
     listaEl.innerHTML = Object.entries(porInstituicao).map(([instituicao, itens]) => {
       const subtotal = itens.reduce((s,inv)=> s + valorAtualInvestimento(inv), 0);
+      const chaveId = 'inst_' + instituicao.replace(/[^a-zA-Z0-9]/g,'');
+      const expandido = instituicoesExpandidas.has(instituicao);
       return `
       <div class="card">
-        <div class="row-between">
-          <div style="font-weight:600; font-size:14.5px">${instituicao}</div>
+        <div class="row-between" style="cursor:pointer" onclick="toggleInstituicao('${instituicao.replace(/'/g,"")}')">
+          <div style="font-weight:600; font-size:14.5px">${expandido?'▾':'▸'} ${instituicao} <span class="muted" style="font-weight:400">(${itens.length})</span></div>
           <div class="value">${brl(subtotal)}</div>
         </div>
+        <div id="${chaveId}" style="display:${expandido ? '' : 'none'}">
         ${itens.map(inv => {
           const valorAtual = valorAtualInvestimento(inv);
           const custo = custoInvestimento(inv);
-          const variacao = (inv.tipo === 'Renda Variável' && custo > 0) ? ((valorAtual-custo)/custo*100) : null;
+          const temCota = (inv.tipo === 'Renda Variável' || inv.tipo === 'Cripto') && inv.quantidade;
+          const variacao = (temCota && custo > 0) ? ((valorAtual-custo)/custo*100) : null;
+          const atualizouMercado = typeof inv.valorMercado === 'number';
           return `
           <div class="despesa-item" style="margin-top:10px; flex-wrap:wrap">
             <div class="despesa-info">
-              <div class="despesa-nome">${inv.nomeAtivo}${inv.ticker ? ' · '+inv.ticker : ''}</div>
-              <div class="despesa-sub">${inv.tipo}${inv.modalidade ? ' · '+inv.modalidade : ''}${inv.segmento ? ' · '+inv.segmento : ''}${inv.quantidade ? ' · '+inv.quantidade+' cotas' : ''}</div>
+              <div class="despesa-nome">${inv.nomeAtivo}${inv.ticker ? ' · '+inv.ticker : ''}${inv.simbolo ? ' · '+inv.simbolo : ''}</div>
+              <div class="despesa-sub">${inv.tipo}${inv.modalidade ? ' · '+inv.modalidade : ''}${inv.segmento ? ' · '+inv.segmento : ''}${inv.quantidade ? ' · '+inv.quantidade+' un.' : ''}</div>
+              ${temCota ? `<div class="despesa-sub mono" style="margin-top:3px">Cota atual: ${brl(precoUnitarioAtual(inv))}${atualizouMercado ? '' : ' (preço médio — sem cotação ainda)'}</div>` : ''}
               ${variacao !== null ? `<div class="despesa-sub" style="color:${variacao>=0?'var(--green)':'var(--terracota)'}; margin-top:3px">${variacao>=0?'↑':'↓'} ${Math.abs(variacao).toFixed(1)}% vs preço médio</div>` : ''}
             </div>
             <div class="despesa-valor" style="color:${CORES_SEGMENTO[segmentoDe(inv)]}">${brl(valorAtual)}</div>
+            <button class="del-btn" onclick="abrirFormInvestimento('${inv.id}')">✏️</button>
             <button class="del-btn" onclick="excluirInvestimento('${inv.id}')">✕</button>
             ${inv.tipo === 'Renda Variável' ? `<button class="btn-outline small" style="width:100%; margin-top:8px" onclick="registrarRendimento('${inv.id}','${inv.contaRendimentoId||''}','${(inv.contaRendimentoNome||'').replace(/'/g,"")}')">💰 Registrar rendimento</button>` : ''}
           </div>`;
         }).join('')}
+        </div>
       </div>`;
     }).join('');
   }
