@@ -182,7 +182,7 @@
       <button class="acao-btn" onclick="mudarView('contas'); setTimeout(abrirFormDespesa, 150)">
         <span class="acao-icone">+</span>Despesa
       </button>
-      <button class="acao-btn" onclick="toast('Investimentos ainda em construção')">
+      <button class="acao-btn" onclick="mudarView('investimentos'); setTimeout(abrirFormInvestimento, 150)">
         <span class="acao-icone">+</span>Investir
       </button>
       <button class="acao-btn" onclick="toast('Cartões ainda em construção')">
@@ -251,9 +251,9 @@
       <button onclick="mudarMes(1)">›</button>
     </div>
 
-    <div class="section-title">Entradas</div>
-    <div id="lista-entradas"><p class="empty-hint">Nenhuma entrada neste mês</p></div>
-    <button class="btn btn-outline" onclick="abrirFormEntrada()">+ &nbsp;Nova entrada</button>
+    <div class="section-title">Receitas</div>
+    <div id="lista-entradas"><p class="empty-hint">Nenhuma receita neste mês</p></div>
+    <button class="btn btn-outline" onclick="abrirFormEntrada()">+ &nbsp;Nova receita</button>
 
     <div class="section-title" style="margin-top:22px">Despesas</div>
     <div id="lista-despesas"><p class="empty-hint">Nenhuma despesa neste mês</p></div>
@@ -424,7 +424,7 @@
   <div class="sheet">
     <div class="sheet-header">
       <button onclick="fecharForm('overlay-entrada')">←</button>
-      <h2>Nova entrada</h2>
+      <h2>Nova receita</h2>
     </div>
     <form id="form-entrada" onsubmit="salvarEntrada(event)">
       <div class="campo">
@@ -445,6 +445,14 @@
         </select>
       </div>
       <div class="campo">
+        <label>Tipo de receita</label>
+        <div class="seg">
+          <button type="button" class="active" data-val="Fixa" onclick="toggleSeg(this)">Fixa</button>
+          <button type="button" data-val="Variável" onclick="toggleSeg(this)">Variável</button>
+        </div>
+        <input type="hidden" id="entrada-tipo" value="Fixa">
+      </div>
+      <div class="campo">
         <label>Conta que recebeu</label>
         <select id="entrada-conta"></select>
       </div>
@@ -453,7 +461,7 @@
         <input type="date" id="entrada-data" required>
       </div>
       <div class="hint muted" style="margin:-8px 2px 16px">O valor entra automaticamente no saldo da conta selecionada.</div>
-      <button class="btn btn-primary" type="submit">Salvar entrada</button>
+      <button class="btn btn-primary" type="submit">Salvar receita</button>
     </form>
   </div>
 </div>
@@ -850,18 +858,19 @@ window.salvarEntrada = async function(e){
   const nome = document.getElementById('entrada-nome').value.trim();
   const valor = parseFloat(document.getElementById('entrada-valor').value || 0);
   const categoria = document.getElementById('entrada-categoria').value;
+  const tipo = document.getElementById('entrada-tipo').value;
   const contaId = document.getElementById('entrada-conta').value;
   const contaObj = contas.find(c => c.id === contaId);
   const data = document.getElementById('entrada-data').value;
   try{
     await addDoc(collection(db, 'entradas'), {
-      nome, valor, categoria, contaId, contaNome: contaObj ? contaObj.nome : '',
+      nome, valor, categoria, tipo, contaId, contaNome: contaObj ? contaObj.nome : '',
       data, criadoEm: serverTimestamp()
     });
     if (contaObj){
       await updateDoc(doc(db, 'contas', contaId), { saldo: (contaObj.saldo||0) + valor });
     }
-    toast('Entrada salva!');
+    toast('Receita salva!');
     document.getElementById('form-entrada').reset();
     fecharForm('overlay-entrada');
   }catch(err){
@@ -871,9 +880,9 @@ window.salvarEntrada = async function(e){
 };
 
 window.excluirEntrada = async function(id){
-  if (!confirm('Excluir esta entrada? (o valor não será removido do saldo automaticamente)')) return;
+  if (!confirm('Excluir esta receita? (o valor não será removido do saldo automaticamente)')) return;
   await deleteDoc(doc(db, 'entradas', id));
-  toast('Entrada excluída');
+  toast('Receita excluída');
 };
 
 window.mudarMes = function(delta){
@@ -918,13 +927,13 @@ function renderEntradas(){
   const chave = mesChave(mesAtual);
   const doMes = entradas.filter(en => (en.data||'').startsWith(chave)).sort((a,b)=> (a.data||'').localeCompare(b.data||''));
   if (doMes.length === 0){
-    elEntradas.innerHTML = '<p class="empty-hint">Nenhuma entrada neste mês</p>';
+    elEntradas.innerHTML = '<p class="empty-hint">Nenhuma receita neste mês</p>';
   } else {
     elEntradas.innerHTML = doMes.map(en => `
       <div class="despesa-item">
         <div class="despesa-info">
           <div class="despesa-nome">${en.nome}</div>
-          <div class="despesa-sub">${en.categoria} · ${en.contaNome || 'sem conta'} · ${formatarData(en.data)}</div>
+          <div class="despesa-sub">${en.categoria}${en.tipo ? ' · '+en.tipo : ''} · ${en.contaNome || 'sem conta'} · ${formatarData(en.data)}</div>
         </div>
         <div class="despesa-valor" style="color:var(--green)">+${brl(en.valor||0)}</div>
         <button class="del-btn" onclick="excluirEntrada('${en.id}')">✕</button>
