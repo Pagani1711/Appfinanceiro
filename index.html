@@ -173,8 +173,9 @@
   <header class="app-header">
     <p class="eyebrow" id="home-date">—</p>
     <h1 class="page-title" id="home-greeting">Olá</h1>
-    <p class="header-sub">SALDO PROJETADO DO MÊS</p>
+    <p class="header-sub">SALDO ATUAL EM CONTAS</p>
     <p class="big-value" id="home-saldo-projetado">R$ 0,00</p>
+    <p class="header-sub" id="home-projecao">Projeção fim do mês: R$ 0,00</p>
     <p class="header-sub" id="home-entradas-saidas">Entradas R$ 0,00 · Saídas R$ 0,00 previstas</p>
   </header>
   <main>
@@ -1372,7 +1373,8 @@ function renderHome(){
   const faltaPagarValor = doMesReal.filter(d=>!d.pago).reduce((s,d)=>s+(d.valor||0),0);
   const saldoProjetado = saldoContas - faltaPagarValor;
 
-  document.getElementById('home-saldo-projetado').textContent = brl(saldoProjetado);
+  document.getElementById('home-saldo-projetado').textContent = brl(saldoContas);
+  document.getElementById('home-projecao').textContent = `Projeção fim do mês: ${brl(saldoProjetado)}`;
   document.getElementById('home-entradas-saidas').textContent = `Entradas ${brl(totalEntradasMes)} · Saídas do mês ${brl(totalSaidas)}`;
 
   // --- Alerta de risco ---
