@@ -255,14 +255,24 @@
   </main>
 </section>
 
-<!-- ===== INVESTIMENTOS (placeholder) ===== -->
+<!-- ===== INVESTIMENTOS ===== -->
 <section id="view-investimentos" class="view">
   <header class="app-header">
     <p class="eyebrow">INVESTIMENTOS</p>
     <h1 class="page-title">Investimentos</h1>
+    <p class="header-sub">TOTAL INVESTIDO (ATUALIZADO)</p>
+    <p class="big-value" id="invest-total">R$ 0,00</p>
   </header>
   <main>
-    <p class="empty-hint">Este módulo ainda está em construção — chega na próxima etapa.</p>
+    <div class="section-title">Por segmento</div>
+    <div class="card" id="invest-segmento-card">
+      <div class="cat-bar" id="invest-seg-bar"></div>
+      <div id="invest-seg-legenda" style="margin-top:12px"></div>
+    </div>
+
+    <div class="section-title">Posições cadastradas</div>
+    <div id="lista-investimentos"><p class="empty-hint">Nenhum investimento cadastrado ainda</p></div>
+    <button class="btn btn-outline" onclick="abrirFormInvestimento()">+ &nbsp;Nova posição</button>
   </main>
 </section>
 
@@ -387,6 +397,76 @@
   </div>
 </div>
 
+<!-- ===== FORM: NOVA POSIÇÃO DE INVESTIMENTO ===== -->
+<div class="overlay" id="overlay-investimento">
+  <div class="sheet">
+    <div class="sheet-header">
+      <button onclick="fecharForm('overlay-investimento')">←</button>
+      <h2>Nova posição</h2>
+    </div>
+    <form id="form-investimento" onsubmit="salvarInvestimento(event)">
+      <div class="campo">
+        <label>Instituição</label>
+        <input type="text" id="inv-instituicao" placeholder="Ex: XP, Rico, Nubank..." required>
+      </div>
+      <div class="campo">
+        <label>Nome do ativo</label>
+        <input type="text" id="inv-nome" placeholder="Ex: Tesouro Selic 2029, Bitcoin..." required>
+      </div>
+      <div class="campo">
+        <label>Tipo de investimento</label>
+        <div class="seg">
+          <button type="button" class="active" data-val="Renda Fixa" onclick="toggleTipoInvestimento(this)">Renda Fixa</button>
+          <button type="button" data-val="Renda Variável" onclick="toggleTipoInvestimento(this)">Renda Var.</button>
+          <button type="button" data-val="Cripto" onclick="toggleTipoInvestimento(this)">Cripto</button>
+        </div>
+        <input type="hidden" id="inv-tipo" value="Renda Fixa">
+      </div>
+
+      <div id="inv-bloco-rendafixa">
+        <div class="campo">
+          <label>Modalidade</label>
+          <div class="seg">
+            <button type="button" class="active" data-val="Pré-fixado" onclick="toggleModalidade(this)">Pré-fixado</button>
+            <button type="button" data-val="Pós-fixado" onclick="toggleModalidade(this)">Pós-fixado</button>
+          </div>
+          <input type="hidden" id="inv-modalidade" value="Pré-fixado">
+        </div>
+      </div>
+
+      <div id="inv-bloco-prefixado">
+        <div class="campo">
+          <label>Valor investido</label>
+          <input type="number" step="0.01" id="inv-valor-investido" placeholder="0,00">
+        </div>
+        <div class="campo">
+          <label>Taxa de juros ao ano (%)</label>
+          <input type="number" step="0.01" id="inv-taxa" placeholder="Ex: 15">
+        </div>
+        <div class="campo">
+          <label>Data de início</label>
+          <input type="date" id="inv-data-inicio">
+        </div>
+        <div class="campo">
+          <label>Data de vencimento</label>
+          <input type="date" id="inv-data-fim">
+        </div>
+        <div class="hint muted" style="margin:-8px 2px 16px">O valor atualizado é calculado automaticamente mês a mês.</div>
+      </div>
+
+      <div id="inv-bloco-manual" style="display:none">
+        <div class="campo">
+          <label>Valor atual</label>
+          <input type="number" step="0.01" id="inv-valor-manual" placeholder="0,00">
+        </div>
+        <div class="hint muted" style="margin:-8px 2px 16px">Esse tipo ainda não atualiza sozinho — edite quando o valor mudar.</div>
+      </div>
+
+      <button class="btn btn-primary" type="submit">Salvar posição</button>
+    </form>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script type="module">
@@ -410,6 +490,7 @@ const db = getFirestore(app);
 
 let contas = [];
 let despesas = [];
+let investimentos = [];
 let mesAtual = new Date(); // mês sendo visualizado na aba Contas
 
 // ---------- Navegação ----------
@@ -433,6 +514,35 @@ window.abrirFormDespesa = function(){
   document.getElementById('overlay-despesa').classList.add('open');
 };
 window.fecharForm = function(id){ document.getElementById(id).classList.remove('open'); };
+
+window.abrirFormInvestimento = function(){ document.getElementById('overlay-investimento').classList.add('open'); };
+
+window.toggleTipoInvestimento = function(btn){
+  toggleSeg(btn);
+  const tipo = btn.dataset.val;
+  const rfBloco = document.getElementById('inv-bloco-rendafixa');
+  const modalidade = document.getElementById('inv-modalidade').value;
+  if (tipo === 'Renda Fixa'){
+    rfBloco.style.display = '';
+    aplicarModalidadeVisual(modalidade);
+  } else {
+    rfBloco.style.display = 'none';
+    document.getElementById('inv-bloco-prefixado').style.display = 'none';
+    document.getElementById('inv-bloco-manual').style.display = '';
+  }
+};
+
+window.toggleModalidade = function(btn){
+  toggleSeg(btn);
+  aplicarModalidadeVisual(btn.dataset.val);
+};
+
+function aplicarModalidadeVisual(modalidade){
+  const pre = document.getElementById('inv-bloco-prefixado');
+  const man = document.getElementById('inv-bloco-manual');
+  if (modalidade === 'Pré-fixado'){ pre.style.display=''; man.style.display='none'; }
+  else { pre.style.display='none'; man.style.display=''; }
+}
 
 function toast(msg){
   const t = document.getElementById('toast');
@@ -587,6 +697,133 @@ function formatarData(iso){
   return `${dd}/${m}`;
 }
 
+// ---------- Investimentos ----------
+window.salvarInvestimento = async function(e){
+  e.preventDefault();
+  const instituicao = document.getElementById('inv-instituicao').value.trim();
+  const nomeAtivo = document.getElementById('inv-nome').value.trim();
+  const tipo = document.getElementById('inv-tipo').value;
+  const dados = { instituicao, nomeAtivo, tipo, criadoEm: serverTimestamp() };
+
+  if (tipo === 'Renda Fixa'){
+    const modalidade = document.getElementById('inv-modalidade').value;
+    dados.modalidade = modalidade;
+    if (modalidade === 'Pré-fixado'){
+      dados.valorInvestido = parseFloat(document.getElementById('inv-valor-investido').value || 0);
+      dados.taxaAnual = parseFloat(document.getElementById('inv-taxa').value || 0);
+      dados.dataInicio = document.getElementById('inv-data-inicio').value;
+      dados.dataFim = document.getElementById('inv-data-fim').value;
+    } else {
+      dados.valorManual = parseFloat(document.getElementById('inv-valor-manual').value || 0);
+    }
+  } else {
+    dados.valorManual = parseFloat(document.getElementById('inv-valor-manual').value || 0);
+  }
+
+  try{
+    await addDoc(collection(db, 'investimentos'), dados);
+    toast('Posição salva!');
+    document.getElementById('form-investimento').reset();
+    fecharForm('overlay-investimento');
+  }catch(err){
+    console.error(err);
+    toast('Erro ao salvar. Veja o console.');
+  }
+};
+
+window.excluirInvestimento = async function(id){
+  if (!confirm('Excluir esta posição?')) return;
+  await deleteDoc(doc(db, 'investimentos', id));
+  toast('Posição excluída');
+};
+
+// Calcula o valor atualizado de uma posição pré-fixada (juros compostos, mês a mês)
+function valorAtualInvestimento(inv){
+  if (inv.tipo === 'Renda Fixa' && inv.modalidade === 'Pré-fixado' && inv.dataInicio && inv.taxaAnual){
+    const inicio = new Date(inv.dataInicio + 'T00:00:00');
+    const fim = inv.dataFim ? new Date(inv.dataFim + 'T00:00:00') : null;
+    const hoje = new Date();
+    const limite = (fim && hoje > fim) ? fim : hoje;
+    let meses = (limite.getFullYear() - inicio.getFullYear())*12 + (limite.getMonth() - inicio.getMonth());
+    meses = Math.max(0, meses);
+    const taxaMensal = Math.pow(1 + (inv.taxaAnual/100), 1/12) - 1;
+    return (inv.valorInvestido||0) * Math.pow(1 + taxaMensal, meses);
+  }
+  return inv.valorManual || 0;
+}
+
+function segmentoDe(inv){
+  if (inv.tipo === 'Renda Fixa') return 'Renda Fixa';
+  if (inv.tipo === 'Cripto') return 'Cripto';
+  return 'Renda Variável';
+}
+
+const CORES_SEGMENTO = { 'Renda Fixa':'#6E9B7B', 'Renda Variável':'#B5645A', 'Cripto':'#B9A06B' };
+
+function renderInvestimentos(){
+  const listaEl = document.getElementById('lista-investimentos');
+  if (!listaEl) return; // view ainda não montada
+
+  if (investimentos.length === 0){
+    listaEl.innerHTML = '<p class="empty-hint">Nenhum investimento cadastrado ainda</p>';
+  } else {
+    // agrupar por instituição
+    const porInstituicao = {};
+    investimentos.forEach(inv => {
+      porInstituicao[inv.instituicao] = porInstituicao[inv.instituicao] || [];
+      porInstituicao[inv.instituicao].push(inv);
+    });
+    listaEl.innerHTML = Object.entries(porInstituicao).map(([instituicao, itens]) => {
+      const subtotal = itens.reduce((s,inv)=> s + valorAtualInvestimento(inv), 0);
+      return `
+      <div class="card">
+        <div class="row-between">
+          <div style="font-weight:600; font-size:14.5px">${instituicao}</div>
+          <div class="value">${brl(subtotal)}</div>
+        </div>
+        ${itens.map(inv => `
+          <div class="despesa-item" style="margin-top:10px">
+            <div class="despesa-info">
+              <div class="despesa-nome">${inv.nomeAtivo}</div>
+              <div class="despesa-sub">${inv.tipo}${inv.modalidade ? ' · '+inv.modalidade : ''}</div>
+            </div>
+            <div class="despesa-valor" style="color:${CORES_SEGMENTO[segmentoDe(inv)]}">${brl(valorAtualInvestimento(inv))}</div>
+            <button class="del-btn" onclick="excluirInvestimento('${inv.id}')">✕</button>
+          </div>
+        `).join('')}
+      </div>`;
+    }).join('');
+  }
+
+  const total = investimentos.reduce((s,inv)=> s + valorAtualInvestimento(inv), 0);
+  document.getElementById('invest-total').textContent = brl(total);
+
+  const porSegmento = {};
+  investimentos.forEach(inv => {
+    const seg = segmentoDe(inv);
+    porSegmento[seg] = (porSegmento[seg]||0) + valorAtualInvestimento(inv);
+  });
+  const segsOrdenados = Object.entries(porSegmento).sort((a,b)=> b[1]-a[1]);
+  const barEl = document.getElementById('invest-seg-bar');
+  const legEl = document.getElementById('invest-seg-legenda');
+  if (segsOrdenados.length === 0){
+    barEl.style.display = 'none';
+    legEl.innerHTML = '<p class="empty-hint">Nada cadastrado ainda</p>';
+  } else {
+    barEl.style.display = 'flex';
+    barEl.innerHTML = segsOrdenados.map(([nome,val]) =>
+      `<div style="width:${(val/total*100)}%; background:${CORES_SEGMENTO[nome]}"></div>`
+    ).join('');
+    legEl.innerHTML = segsOrdenados.map(([nome,val]) => `
+      <div class="cat-legenda-item">
+        <span class="dot" style="background:${CORES_SEGMENTO[nome]}"></span>
+        <span class="nome">${nome}</span>
+        <span class="pct mono">${brl(val)}</span>
+      </div>
+    `).join('');
+  }
+}
+
 // ---------- Home ----------
 const FRASES_INVESTIMENTO = [
   "O melhor momento para investir foi ontem. O segundo melhor é hoje.",
@@ -718,6 +955,11 @@ onSnapshot(query(collection(db, 'contas'), orderBy('criadoEm','asc')), snap => {
 onSnapshot(query(collection(db, 'despesas'), orderBy('vencimento','asc')), snap => {
   despesas = snap.docs.map(d => ({ id:d.id, ...d.data() }));
   renderDespesas();
+});
+
+onSnapshot(query(collection(db, 'investimentos'), orderBy('criadoEm','asc')), snap => {
+  investimentos = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+  renderInvestimentos();
 });
 
 renderDespesas();
