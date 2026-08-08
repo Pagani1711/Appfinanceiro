@@ -299,16 +299,157 @@
   </main>
 </section>
 
-<!-- ===== CARTÕES (placeholder) ===== -->
+<!-- ===== CARTÕES ===== -->
 <section id="view-cartoes" class="view">
-  <header class="app-header">
-    <p class="eyebrow">CARTÕES</p>
-    <h1 class="page-title">Cartões</h1>
-  </header>
-  <main>
-    <p class="empty-hint">Este módulo ainda está em construção — chega na próxima etapa.</p>
-  </main>
+
+  <!-- painel: lista de cartões -->
+  <div id="cartoes-painel-lista">
+    <header class="app-header">
+      <p class="eyebrow">CARTÕES</p>
+      <h1 class="page-title">Meus Cartões</h1>
+      <p class="header-sub">LIMITE TOTAL DISPONÍVEL</p>
+      <p class="big-value" id="cartoes-limite-total">R$ 0,00</p>
+    </header>
+    <main>
+      <div class="section-title">Cadastrados</div>
+      <div id="lista-cartoes"><p class="empty-hint">Nenhum cartão cadastrado ainda</p></div>
+      <button class="btn btn-outline" onclick="abrirFormCartao()">+ &nbsp;Novo cartão</button>
+    </main>
+  </div>
+
+  <!-- painel: fatura de um cartão -->
+  <div id="cartoes-painel-fatura" style="display:none">
+    <header class="app-header">
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:4px">
+        <button onclick="fecharFatura()" style="background:rgba(255,255,255,.14); border:none; color:#fff; width:28px; height:28px; border-radius:50%; cursor:pointer">←</button>
+        <p class="eyebrow" id="fatura-cartao-nome" style="margin:0">CARTÃO</p>
+      </div>
+      <h1 class="page-title" id="fatura-titulo">Fatura</h1>
+      <div class="month-switch" style="justify-content:flex-start; gap:12px; margin-top:6px">
+        <button onclick="mudarMesFatura(-1)" style="color:#B6BBCE">‹</button>
+        <span class="label" id="fatura-mes-label" style="color:#fff">—</span>
+        <button onclick="mudarMesFatura(1)" style="color:#B6BBCE">›</button>
+      </div>
+      <p class="header-sub" id="fatura-fechamento-info" style="margin-top:8px">—</p>
+      <p class="header-sub">LANÇADO NESTA FATURA</p>
+      <p class="big-value" id="fatura-total">R$ 0,00</p>
+    </header>
+    <main>
+      <div class="btn-row" style="margin-bottom:6px">
+        <button class="btn-outline small" style="padding:13px" onclick="document.getElementById('input-extrato').click()">⇪ Importar extrato</button>
+        <button class="btn-outline small" style="padding:13px" onclick="abrirFormLancamento()">＋ Lançamento manual</button>
+      </div>
+      <input type="file" id="input-extrato" accept=".csv,.xlsx,.xls" style="display:none" onchange="importarExtrato(event)">
+
+      <div class="section-title">Gasto por categoria</div>
+      <div class="card" id="fatura-categoria-card">
+        <div class="cat-bar" id="fatura-cat-bar"></div>
+        <div id="fatura-cat-legenda" style="margin-top:12px"></div>
+      </div>
+
+      <div class="section-title">Compromisso de parcelas</div>
+      <div id="fatura-parcelas"><p class="empty-hint">Nenhuma parcela em aberto</p></div>
+
+      <div class="section-title">Lançamentos</div>
+      <div id="lista-lancamentos"><p class="empty-hint">Nenhum lançamento nesta fatura</p></div>
+    </main>
+  </div>
 </section>
+
+<!-- ===== FORM: NOVO CARTÃO ===== -->
+<div class="overlay" id="overlay-cartao">
+  <div class="sheet">
+    <div class="sheet-header">
+      <button onclick="fecharForm('overlay-cartao')">←</button>
+      <h2>Novo cartão</h2>
+    </div>
+    <form id="form-cartao" onsubmit="salvarCartao(event)">
+      <div class="campo">
+        <label>Nome do cartão</label>
+        <input type="text" id="cartao-nome" placeholder="Ex: Bradesco Elo Nanquim" required>
+      </div>
+      <div class="campo">
+        <label>Final (últimos 4 dígitos)</label>
+        <input type="text" id="cartao-final" placeholder="Ex: 5404" maxlength="4">
+      </div>
+      <div class="campo">
+        <label>Limite total</label>
+        <input type="number" step="0.01" id="cartao-limite" placeholder="0,00" required>
+      </div>
+      <div class="campo">
+        <label>Dia de fechamento da fatura</label>
+        <input type="number" min="1" max="31" id="cartao-fechamento" placeholder="Ex: 25" required>
+        <div class="hint muted" style="margin-top:6px">Pode variar mês a mês — edite aqui sempre que mudar.</div>
+      </div>
+      <div class="campo">
+        <label>Dia de vencimento</label>
+        <input type="number" min="1" max="31" id="cartao-vencimento" placeholder="Ex: 5" required>
+      </div>
+      <button class="btn btn-primary" type="submit">Salvar cartão</button>
+    </form>
+  </div>
+</div>
+
+<!-- ===== FORM: LANÇAMENTO NO CARTÃO ===== -->
+<div class="overlay" id="overlay-lancamento">
+  <div class="sheet">
+    <div class="sheet-header">
+      <button onclick="fecharForm('overlay-lancamento')">←</button>
+      <h2>Novo lançamento</h2>
+    </div>
+    <form id="form-lancamento" onsubmit="salvarLancamento(event)">
+      <div class="campo">
+        <label>Descrição</label>
+        <input type="text" id="lanc-descricao" placeholder="Ex: Panvel Farmácias" required>
+      </div>
+      <div class="campo">
+        <label>Valor</label>
+        <input type="number" step="0.01" id="lanc-valor" placeholder="0,00" required>
+      </div>
+      <div class="campo">
+        <label>Data da compra</label>
+        <input type="date" id="lanc-data" required>
+      </div>
+      <div class="campo">
+        <label>Categoria</label>
+        <select id="lanc-categoria">
+          <option>Moradia</option>
+          <option>Alimentação/Restaurante</option>
+          <option>Padaria/Mercado</option>
+          <option>Farmácia/Saúde</option>
+          <option>Academia/Bem-estar</option>
+          <option>Lavanderia/Serviços</option>
+          <option>Viagem/Hospedagem</option>
+          <option>Compras Online</option>
+          <option>Assinaturas</option>
+          <option>Transporte/Auto</option>
+          <option>Vestuário/Beleza</option>
+          <option>Transferência Pessoal</option>
+          <option>Pet</option>
+          <option>Reembolsável Trabalho</option>
+          <option>Outros</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label>É parcelado?</label>
+        <div class="seg">
+          <button type="button" class="active" data-val="nao" onclick="toggleParcelado(this)">Não</button>
+          <button type="button" data-val="sim" onclick="toggleParcelado(this)">Sim</button>
+        </div>
+        <input type="hidden" id="lanc-parcelado" value="nao">
+      </div>
+      <div class="campo" id="lanc-parcela-atual-campo" style="display:none">
+        <label>Parcela atual</label>
+        <input type="number" min="1" id="lanc-parcela-atual" placeholder="Ex: 1">
+      </div>
+      <div class="campo" id="lanc-parcela-total-campo" style="display:none">
+        <label>Total de parcelas</label>
+        <input type="number" min="1" id="lanc-parcela-total" placeholder="Ex: 5">
+      </div>
+      <button class="btn btn-primary" type="submit">Salvar lançamento</button>
+    </form>
+  </div>
+</div>
 
 <!-- ===== BOTTOM NAV ===== -->
 <nav class="bottom-nav">
@@ -604,6 +745,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
 import {
@@ -627,7 +769,11 @@ let contas = [];
 let despesas = [];
 let investimentos = [];
 let entradas = [];
+let cartoes = [];
+let lancamentosCartao = [];
 let mesAtual = new Date(); // mês sendo visualizado na aba Contas
+let cartaoAbertoId = null;
+let mesFatura = new Date(); // mês de vencimento da fatura sendo visualizada
 
 // ---------- Navegação ----------
 window.mudarView = function(nome){
@@ -655,6 +801,17 @@ window.abrirFormEntrada = function(){
   document.getElementById('overlay-entrada').classList.add('open');
 };
 window.fecharForm = function(id){ document.getElementById(id).classList.remove('open'); };
+
+window.abrirFormCartao = function(){ document.getElementById('overlay-cartao').classList.add('open'); };
+
+window.abrirFormLancamento = function(){ document.getElementById('overlay-lancamento').classList.add('open'); };
+
+window.toggleParcelado = function(btn){
+  toggleSeg(btn);
+  const sim = btn.dataset.val === 'sim';
+  document.getElementById('lanc-parcela-atual-campo').style.display = sim ? '' : 'none';
+  document.getElementById('lanc-parcela-total-campo').style.display = sim ? '' : 'none';
+};
 
 let investimentoEditandoId = null;
 
@@ -1349,6 +1506,299 @@ function renderPatrimonio(){
   `).join('');
 }
 
+// ---------- Cartões ----------
+window.salvarCartao = async function(e){
+  e.preventDefault();
+  const nome = document.getElementById('cartao-nome').value.trim();
+  const final = document.getElementById('cartao-final').value.trim();
+  const limiteTotal = parseFloat(document.getElementById('cartao-limite').value || 0);
+  const diaFechamento = parseInt(document.getElementById('cartao-fechamento').value || 25);
+  const diaVencimento = parseInt(document.getElementById('cartao-vencimento').value || 5);
+  try{
+    await addDoc(collection(db, 'cartoes'), { nome, final, limiteTotal, diaFechamento, diaVencimento, criadoEm: serverTimestamp() });
+    toast('Cartão salvo!');
+    document.getElementById('form-cartao').reset();
+    fecharForm('overlay-cartao');
+  }catch(err){
+    console.error(err);
+    toast('Erro ao salvar. Veja o console.');
+  }
+};
+
+window.excluirCartao = async function(id){
+  if (!confirm('Excluir este cartão? Os lançamentos vinculados continuarão salvos, mas ficarão órfãos.')) return;
+  await deleteDoc(doc(db, 'cartoes', id));
+  toast('Cartão excluído');
+};
+
+// Determina em qual mês de VENCIMENTO (YYYY-MM) uma compra cai, dado o dia de fechamento do cartão
+function mesFaturaDe(dataCompraISO, diaFechamento){
+  const d = new Date(dataCompraISO + 'T00:00:00');
+  let mes = d.getMonth(); // 0-indexed
+  let ano = d.getFullYear();
+  const offset = d.getDate() > diaFechamento ? 2 : 1;
+  mes += offset;
+  while (mes > 11){ mes -= 12; ano += 1; }
+  return `${ano}-${String(mes+1).padStart(2,'0')}`;
+}
+
+function renderCartoes(){
+  const listaEl = document.getElementById('lista-cartoes');
+  if (!listaEl) return;
+
+  if (cartoes.length === 0){
+    listaEl.innerHTML = '<p class="empty-hint">Nenhum cartão cadastrado ainda</p>';
+  } else {
+    const chaveMesAtual = mesChave(new Date());
+    listaEl.innerHTML = cartoes.map(cart => {
+      const lancsFatura = lancamentosCartao.filter(l => l.cartaoId === cart.id && mesFaturaDe(l.data, cart.diaFechamento) === chaveMesAtual);
+      const totalFatura = lancsFatura.reduce((s,l)=> s + (l.valor||0), 0);
+      const limiteDisp = (cart.limiteTotal||0) - totalFatura;
+      const usoRatio = cart.limiteTotal > 0 ? Math.min(1, totalFatura/cart.limiteTotal) : 0;
+      return `
+      <div class="card conta-card" onclick="abrirFatura('${cart.id}')" style="cursor:pointer">
+        <div class="row-between">
+          <div>
+            <div style="font-weight:600; font-size:15px">${cart.nome}</div>
+            <div class="muted">${cart.final ? 'final '+cart.final : 'cartão de crédito'}</div>
+          </div>
+          <button class="del-btn" onclick="event.stopPropagation(); excluirCartao('${cart.id}')">✕</button>
+        </div>
+        <div class="barra" style="margin-top:12px"><div class="barra-fill" style="width:${usoRatio*100}%"></div></div>
+        <div class="muted" style="margin-top:8px">Disponível ${brl(limiteDisp)} de ${brl(cart.limiteTotal||0)}</div>
+        <div class="row-between" style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--line)">
+          <span class="muted">Fatura aberta · vence dia ${cart.diaVencimento}</span>
+          <span class="value" style="color:var(--terracota)">${brl(totalFatura)}</span>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  const limiteTotalGeral = cartoes.reduce((s,c)=> {
+    const chaveMesAtual = mesChave(new Date());
+    const totalFatura = lancamentosCartao.filter(l => l.cartaoId === c.id && mesFaturaDe(l.data, c.diaFechamento) === chaveMesAtual).reduce((s2,l)=> s2+(l.valor||0), 0);
+    return s + Math.max(0, (c.limiteTotal||0) - totalFatura);
+  }, 0);
+  document.getElementById('cartoes-limite-total').textContent = brl(limiteTotalGeral);
+}
+
+window.abrirFatura = function(cartaoId){
+  cartaoAbertoId = cartaoId;
+  mesFatura = new Date();
+  document.getElementById('cartoes-painel-lista').style.display = 'none';
+  document.getElementById('cartoes-painel-fatura').style.display = '';
+  renderFatura();
+};
+
+window.fecharFatura = function(){
+  cartaoAbertoId = null;
+  document.getElementById('cartoes-painel-fatura').style.display = 'none';
+  document.getElementById('cartoes-painel-lista').style.display = '';
+  renderCartoes();
+};
+
+window.mudarMesFatura = function(delta){
+  mesFatura.setMonth(mesFatura.getMonth() + delta);
+  mesFatura = new Date(mesFatura);
+  renderFatura();
+};
+
+function renderFatura(){
+  const cart = cartoes.find(c => c.id === cartaoAbertoId);
+  if (!cart) return;
+  const chaveFatura = mesChave(mesFatura);
+
+  document.getElementById('fatura-cartao-nome').textContent = cart.nome.toUpperCase() + (cart.final ? ' · FINAL '+cart.final : '');
+  document.getElementById('fatura-titulo').textContent = 'Fatura de ' + NOMES_MES[mesFatura.getMonth()];
+  document.getElementById('fatura-mes-label').textContent = NOMES_MES[mesFatura.getMonth()] + '/' + mesFatura.getFullYear();
+  document.getElementById('fatura-fechamento-info').textContent = `Fecha dia ${cart.diaFechamento} · Vence dia ${cart.diaVencimento}`;
+
+  const lancsFatura = lancamentosCartao.filter(l => l.cartaoId === cart.id && mesFaturaDe(l.data, cart.diaFechamento) === chaveFatura)
+    .sort((a,b)=> (b.data||'').localeCompare(a.data||''));
+  const totalFatura = lancsFatura.reduce((s,l)=> s + (l.valor||0), 0);
+  document.getElementById('fatura-total').textContent = brl(totalFatura);
+
+  // categoria
+  const porCategoria = {};
+  lancsFatura.forEach(l => { porCategoria[l.categoria] = (porCategoria[l.categoria]||0) + (l.valor||0); });
+  const catsOrdenadas = Object.entries(porCategoria).sort((a,b)=> b[1]-a[1]);
+  const barEl = document.getElementById('fatura-cat-bar');
+  const legEl = document.getElementById('fatura-cat-legenda');
+  if (catsOrdenadas.length === 0){
+    barEl.style.display = 'none';
+    legEl.innerHTML = '<p class="empty-hint">Nenhum gasto nesta fatura</p>';
+  } else {
+    barEl.style.display = 'flex';
+    barEl.innerHTML = catsOrdenadas.map(([nome,val],i) =>
+      `<div style="width:${(val/totalFatura*100)}%; background:${CORES_CATEGORIA[i % CORES_CATEGORIA.length]}"></div>`
+    ).join('');
+    legEl.innerHTML = catsOrdenadas.map(([nome,val],i) => `
+      <div class="cat-legenda-item">
+        <span class="dot" style="background:${CORES_CATEGORIA[i % CORES_CATEGORIA.length]}"></span>
+        <span class="nome">${nome}</span>
+        <span class="pct">${Math.round(val/totalFatura*100)}%</span>
+      </div>
+    `).join('');
+  }
+
+  // parcelas — projeta os próximos meses com base nas parcelas em aberto de TODOS os lançamentos do cartão
+  const parcelados = lancamentosCartao.filter(l => l.cartaoId === cart.id && l.parcelaTotal > 1);
+  const porMesParcela = {};
+  parcelados.forEach(l => {
+    const mesBase = mesFaturaDe(l.data, cart.diaFechamento); // mês em que a parcela atual cai
+    const restantes = l.parcelaTotal - l.parcelaAtual; // quantas parcelas futuras depois dessa
+    for (let i = 0; i <= restantes; i++){
+      const [ano,mes] = mesBase.split('-').map(Number);
+      const dt = new Date(ano, mes-1+i, 1);
+      const chave = mesChave(dt);
+      porMesParcela[chave] = (porMesParcela[chave]||0) + (l.valor||0);
+    }
+  });
+  const mesesParcela = Object.entries(porMesParcela).sort((a,b)=> a[0].localeCompare(b[0])).slice(0,6);
+  const parcelasEl = document.getElementById('fatura-parcelas');
+  if (mesesParcela.length === 0){
+    parcelasEl.innerHTML = '<p class="empty-hint">Nenhuma parcela em aberto</p>';
+  } else {
+    const maxV = Math.max(...mesesParcela.map(([,v])=>v));
+    parcelasEl.innerHTML = `<div class="card" style="display:flex; align-items:flex-end; gap:8px; padding-top:24px">` +
+      mesesParcela.map(([chave,val]) => {
+        const [ano,mes] = chave.split('-').map(Number);
+        const altura = 8 + (val/maxV)*54;
+        const atual = chave === mesChave(new Date());
+        return `
+        <div style="flex:1; text-align:center">
+          <div class="mono" style="font-size:9px; color:var(--ink-soft); margin-bottom:4px">${brl(val).replace('R$ ','')}</div>
+          <div style="height:${altura}px; border-radius:5px; background:${atual?'var(--navy)':'var(--gold)'}"></div>
+          <div style="font-size:9.5px; color:var(--ink-soft); margin-top:6px">${NOMES_MES[mes-1].slice(0,3)}/${String(ano).slice(2)}</div>
+        </div>`;
+      }).join('') + `</div>`;
+  }
+
+  // lançamentos
+  const listaEl = document.getElementById('lista-lancamentos');
+  if (lancsFatura.length === 0){
+    listaEl.innerHTML = '<p class="empty-hint">Nenhum lançamento nesta fatura</p>';
+  } else {
+    listaEl.innerHTML = lancsFatura.map(l => `
+      <div class="despesa-item" style="flex-wrap:wrap">
+        <div class="despesa-info">
+          <div class="despesa-nome">${l.descricao}</div>
+          <div class="despesa-sub">${formatarData(l.data)} · ${l.categoria}${l.parcelaTotal>1 ? ' · '+l.parcelaAtual+'/'+l.parcelaTotal : ''}</div>
+        </div>
+        <div class="despesa-valor" style="color:var(--terracota)">${brl(l.valor||0)}</div>
+        <button class="del-btn" onclick="excluirLancamento('${l.id}')">✕</button>
+      </div>
+    `).join('');
+  }
+}
+
+window.salvarLancamento = async function(e){
+  e.preventDefault();
+  const descricao = document.getElementById('lanc-descricao').value.trim();
+  const valor = parseFloat(document.getElementById('lanc-valor').value || 0);
+  const data = document.getElementById('lanc-data').value;
+  const categoria = document.getElementById('lanc-categoria').value;
+  const parcelado = document.getElementById('lanc-parcelado').value === 'sim';
+  const parcelaAtual = parcelado ? parseInt(document.getElementById('lanc-parcela-atual').value || 1) : 1;
+  const parcelaTotal = parcelado ? parseInt(document.getElementById('lanc-parcela-total').value || 1) : 1;
+  try{
+    await addDoc(collection(db, 'lancamentosCartao'), {
+      cartaoId: cartaoAbertoId, descricao, valor, data, categoria, parcelaAtual, parcelaTotal, criadoEm: serverTimestamp()
+    });
+    toast('Lançamento salvo!');
+    document.getElementById('form-lancamento').reset();
+    fecharForm('overlay-lancamento');
+  }catch(err){
+    console.error(err);
+    toast('Erro ao salvar. Veja o console.');
+  }
+};
+
+window.excluirLancamento = async function(id){
+  if (!confirm('Excluir este lançamento?')) return;
+  await deleteDoc(doc(db, 'lancamentosCartao', id));
+  toast('Lançamento excluído');
+};
+
+// Importação de extrato (.csv ou .xlsx) — best effort: tenta identificar colunas de data/descrição/valor
+window.importarExtrato = async function(event){
+  const file = event.target.files[0];
+  if (!file || !cartaoAbertoId) return;
+  toast('Lendo arquivo...');
+  try{
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(buffer, { type:'array' });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const linhas = XLSX.utils.sheet_to_json(sheet, { header:1, defval:'' });
+
+    // acha a linha de cabeçalho procurando por "data" numa das primeiras 5 linhas
+    let headerIdx = -1, colData = -1, colDesc = -1, colValor = -1;
+    for (let i=0; i<Math.min(5,linhas.length); i++){
+      const linha = linhas[i].map(c => String(c).toLowerCase());
+      const iData = linha.findIndex(c => c.includes('data'));
+      const iDesc = linha.findIndex(c => c.includes('histór') || c.includes('descri'));
+      if (iData >= 0 && iDesc >= 0){
+        headerIdx = i; colData = iData; colDesc = iDesc;
+        // valor: procura coluna com "r$" ou "valor", senão pega a última coluna
+        colValor = linha.findIndex(c => c.includes('r$') || c.includes('valor'));
+        if (colValor < 0) colValor = linha.length - 1;
+        break;
+      }
+    }
+    if (headerIdx < 0){ toast('Não consegui identificar as colunas — tenta lançamento manual'); return; }
+
+    let importados = 0, ignorados = 0;
+    for (let i = headerIdx+1; i < linhas.length; i++){
+      const linha = linhas[i];
+      if (!linha || linha.length === 0) continue;
+      const rawData = String(linha[colData]||'').trim();
+      const rawDesc = String(linha[colDesc]||'').trim();
+      const rawValor = String(linha[colValor]||'').trim();
+      if (!rawData || !rawDesc || !rawValor) { continue; }
+
+      // pula linhas de saldo/pagamento
+      const descLower = rawDesc.toLowerCase();
+      if (descLower.includes('saldo anterior') || descLower.includes('pag boleto') || descLower.includes('pagamento')){
+        ignorados++; continue;
+      }
+
+      const valor = parseFloat(rawValor.replace(/\./g,'').replace(',','.').replace(/[^\d.-]/g,''));
+      if (isNaN(valor) || valor <= 0){ continue; }
+
+      // data no formato DD/MM (sem ano) — assume o ano corrente ou anterior se o mês for maior que o atual
+      let dataISO = null;
+      const m = rawData.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
+      if (m){
+        const dia = m[1].padStart(2,'0');
+        const mes = m[2].padStart(2,'0');
+        let ano = m[3] ? (m[3].length===2 ? '20'+m[3] : m[3]) : String(new Date().getFullYear());
+        dataISO = `${ano}-${mes}-${dia}`;
+      }
+      if (!dataISO) { continue; }
+
+      // detecta parcela tipo "4/5" na descrição
+      let parcelaAtual = 1, parcelaTotal = 1, descricaoLimpa = rawDesc;
+      const pm = rawDesc.match(/(\d{1,2})\/(\d{1,2})\s*$/);
+      if (pm){
+        parcelaAtual = parseInt(pm[1]);
+        parcelaTotal = parseInt(pm[2]);
+        descricaoLimpa = rawDesc.replace(pm[0], '').trim();
+      }
+
+      await addDoc(collection(db, 'lancamentosCartao'), {
+        cartaoId: cartaoAbertoId, descricao: descricaoLimpa, valor, data: dataISO,
+        categoria: 'Outros', parcelaAtual, parcelaTotal, criadoEm: serverTimestamp()
+      });
+      importados++;
+    }
+    toast(`${importados} lançamento(s) importado(s), ${ignorados} ignorado(s) automaticamente`);
+  }catch(err){
+    console.error(err);
+    toast('Não consegui ler esse arquivo — tenta lançamento manual');
+  }
+  event.target.value = '';
+};
+
 // ---------- Home ----------
 const FRASES_INVESTIMENTO = [
   "O melhor momento para investir foi ontem. O segundo melhor é hoje.",
@@ -1494,6 +1944,18 @@ onSnapshot(query(collection(db, 'entradas'), orderBy('data','asc')), snap => {
 onSnapshot(query(collection(db, 'investimentos'), orderBy('criadoEm','asc')), snap => {
   investimentos = snap.docs.map(d => ({ id:d.id, ...d.data() }));
   renderInvestimentos();
+});
+
+onSnapshot(query(collection(db, 'cartoes'), orderBy('criadoEm','asc')), snap => {
+  cartoes = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+  renderCartoes();
+  if (cartaoAbertoId) renderFatura();
+});
+
+onSnapshot(query(collection(db, 'lancamentosCartao'), orderBy('data','desc')), snap => {
+  lancamentosCartao = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+  renderCartoes();
+  if (cartaoAbertoId) renderFatura();
 });
 
 renderDespesas();
