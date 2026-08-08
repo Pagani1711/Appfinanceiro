@@ -82,7 +82,7 @@
   .despesa-sub{ font-size:11px; color:var(--ink-soft); margin-top:2px;}
   .despesa-valor{ font-family:'IBM Plex Mono',monospace; font-size:14px; white-space:nowrap; }
   .despesa-valor.fixa{ color:var(--terracota); }
-  .despesa-valor.variavel{ color:var(--navy-mid); }
+  .despesa-valor.variavel{ color:#5B7291; }
   .del-btn{ background:none; border:none; color:var(--ink-soft); font-size:15px; cursor:pointer; padding:4px; }
 
   .month-switch{ display:flex; align-items:center; justify-content:center; gap:16px; margin:6px 0 4px; }
@@ -842,8 +842,18 @@ window.salvarDespesa = async function(e){
   }
 };
 
-window.togglePago = async function(id, atual){
-  await updateDoc(doc(db, 'despesas', id), { pago: !atual });
+window.togglePago = async function(id, atual, contaId, valor){
+  try{
+    await updateDoc(doc(db, 'despesas', id), { pago: !atual });
+    const contaObj = contas.find(c => c.id === contaId);
+    if (contaObj){
+      const novoSaldo = (contaObj.saldo||0) + (atual ? valor : -valor); // desmarcar devolve, marcar subtrai
+      await updateDoc(doc(db, 'contas', contaId), { saldo: novoSaldo });
+    }
+  }catch(err){
+    console.error(err);
+    toast('Erro ao atualizar. Veja o console.');
+  }
 };
 
 window.excluirDespesa = async function(id){
@@ -918,7 +928,7 @@ function renderDespesas(){
   } else {
     el.innerHTML = doMes.map(d => `
       <div class="despesa-item ${d.pago ? 'paga' : ''}">
-        <div class="check ${d.pago ? 'on' : ''}" onclick="togglePago('${d.id}', ${d.pago})">${d.pago ? '✓' : ''}</div>
+        <div class="check ${d.pago ? 'on' : ''}" onclick="togglePago('${d.id}', ${d.pago}, '${d.contaId||''}', ${d.valor||0})">${d.pago ? '✓' : ''}</div>
         <div class="despesa-info">
           <div class="despesa-nome">${d.nome}</div>
           <div class="despesa-sub">${d.categoria} · ${d.contaNome || 'sem conta'} · vence ${formatarData(d.vencimento)}</div>
