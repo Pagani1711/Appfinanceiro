@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Contas 2026</title>
+<title>AppFinanceiro</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -133,6 +133,31 @@
   }
   .seg button.active{ background:var(--navy); color:#fff; border-color:var(--navy); }
 
+  .acoes-rapidas{ display:flex; gap:10px; margin-bottom:6px; }
+  .acao-btn{
+    flex:1; background:var(--white); border:1px solid var(--line); border-radius:12px;
+    padding:14px 6px 12px; display:flex; flex-direction:column; align-items:center; gap:6px;
+    font-family:'Jost',sans-serif; font-size:11.5px; font-weight:500; color:var(--ink); cursor:pointer;
+  }
+  .acao-icone{ font-size:17px; font-weight:600; color:var(--navy); }
+
+  .alerta-card{ border-color:var(--terracota); background:#F6ECEA; }
+  .alerta-card.ok{ border-color:var(--green); background:#EEF3EE; }
+  .alerta-titulo{ font-weight:600; font-size:13.5px; color:var(--terracota); }
+  .alerta-card.ok .alerta-titulo{ color:var(--green); }
+
+  .quote-card{
+    background:var(--navy); color:#fff; border-radius:14px; padding:18px 18px 16px;
+    font-size:13.5px; line-height:1.55; margin-bottom:4px;
+  }
+  .quote-card .fonte{ font-size:10px; color:#B6BBCE; margin-top:10px; display:block; }
+
+  .cat-bar{ height:9px; border-radius:99px; overflow:hidden; display:flex; background:var(--line); }
+  .cat-legenda-item{ display:flex; align-items:center; font-size:12px; padding:4px 0; }
+  .cat-legenda-item .dot{ width:8px; height:8px; border-radius:99px; margin-right:8px; flex-shrink:0; }
+  .cat-legenda-item .nome{ flex:1; }
+  .cat-legenda-item .pct{ font-family:'IBM Plex Mono',monospace; color:var(--ink-soft); font-size:11.5px; }
+
   .toast{
     position:fixed; bottom:96px; left:50%; transform:translateX(-50%);
     background:var(--ink); color:#fff; padding:10px 18px; border-radius:99px; font-size:12.5px;
@@ -153,16 +178,56 @@
     <p class="header-sub" id="home-entradas-saidas">Entradas R$ 0,00 · Saídas R$ 0,00 previstas</p>
   </header>
   <main>
-    <div class="section-title">Contas pagas no mês</div>
-    <div class="card row-between">
-      <div>
-        <div class="value" id="home-contas-pagas">0/0 pagas</div>
-        <div class="muted" style="margin-top:6px" id="home-falta-pagar">Nenhuma despesa cadastrada ainda</div>
-      </div>
+    <div class="acoes-rapidas">
+      <button class="acao-btn" onclick="mudarView('contas'); setTimeout(abrirFormDespesa, 150)">
+        <span class="acao-icone">+</span>Despesa
+      </button>
+      <button class="acao-btn" onclick="toast('Investimentos ainda em construção')">
+        <span class="acao-icone">+</span>Investir
+      </button>
+      <button class="acao-btn" onclick="toast('Cartões ainda em construção')">
+        <span class="acao-icone">↑</span>Fatura
+      </button>
+    </div>
+
+    <div class="section-title">Como está o mês</div>
+    <div class="card alerta-card" id="home-alerta">
+      <div class="alerta-titulo" id="home-alerta-titulo">—</div>
+      <div class="muted" id="home-alerta-texto" style="margin-top:6px; line-height:1.5"></div>
     </div>
 
     <div class="section-title">Próximos vencimentos</div>
     <div id="home-vencimentos"><p class="empty-hint">Nada por aqui ainda</p></div>
+
+    <div class="section-title">Para pensar</div>
+    <div class="quote-card" id="home-quote">—</div>
+
+    <div class="section-title">Contas pagas no mês</div>
+    <div class="card" style="display:flex; align-items:center; gap:18px">
+      <svg width="86" height="86" viewBox="0 0 86 86" style="flex-shrink:0">
+        <circle cx="43" cy="43" r="36" fill="none" stroke="var(--line)" stroke-width="9"/>
+        <circle id="home-ring" cx="43" cy="43" r="36" fill="none" stroke="var(--green)" stroke-width="9"
+          stroke-linecap="round" transform="rotate(-90 43 43)" stroke-dasharray="226" stroke-dashoffset="226"/>
+        <text id="home-ring-text" x="43" y="40" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="15" fill="var(--ink)">0/0</text>
+        <text x="43" y="55" text-anchor="middle" font-family="'Jost',sans-serif" font-size="8.5" fill="var(--ink-soft)">pagas</text>
+      </svg>
+      <div>
+        <div style="font-weight:600; font-size:14px" id="home-faltam-contas">Faltam 0 contas</div>
+        <div class="muted" style="margin-top:5px; line-height:1.5" id="home-falta-pagar">Nenhuma despesa cadastrada ainda</div>
+      </div>
+    </div>
+
+    <div class="section-title">Onde foi seu dinheiro este mês</div>
+    <div class="card" id="home-categoria-card">
+      <div class="cat-bar" id="home-cat-bar"></div>
+      <div id="home-cat-legenda" style="margin-top:12px"></div>
+    </div>
+
+    <div class="section-title">Comparado ao mês anterior</div>
+    <div class="card" id="home-comparativo">
+      <div class="alerta-titulo" id="home-comp-titulo" style="color:var(--ink)">—</div>
+      <div class="muted" style="margin-top:6px" id="home-comp-texto"></div>
+    </div>
   </main>
 </section>
 
@@ -171,7 +236,7 @@
   <header class="app-header">
     <p class="eyebrow">CONTAS</p>
     <h1 class="page-title">Minhas Contas</h1>
-    <p class="header-sub">DISPONÍVEL TOTAL (SALDO + LIMITE)</p>
+    <p class="header-sub">SALDO TOTAL EM CONTAS</p>
     <p class="big-value" id="contas-disponivel-total">R$ 0,00</p>
   </header>
   <main>
@@ -284,6 +349,7 @@
       <div class="campo">
         <label>Categoria</label>
         <select id="despesa-categoria">
+          <option>Moradia</option>
           <option>Alimentação/Restaurante</option>
           <option>Padaria/Mercado</option>
           <option>Farmácia/Saúde</option>
@@ -404,8 +470,12 @@ function renderContas(){
     el.innerHTML = '<p class="empty-hint">Nenhuma conta cadastrada ainda</p>';
   } else {
     el.innerHTML = contas.map(c => {
-      const disponivel = (c.saldo||0) + (c.temLimite ? (c.limite||0) : 0);
-      const usoLimite = c.temLimite && c.limite > 0 ? Math.min(1, Math.max(0, 1 - (c.saldo/ (c.saldo+c.limite)))) : 0;
+      const saldo = c.saldo||0;
+      const limite = c.temLimite ? (c.limite||0) : 0;
+      const usandoLimite = saldo < 0;
+      const limiteUsado = usandoLimite ? Math.min(Math.abs(saldo), limite) : 0;
+      const limiteDisponivel = limite - limiteUsado;
+      const usoRatio = limite > 0 ? Math.min(1, limiteUsado/limite) : 0;
       return `
       <div class="card conta-card">
         <div class="row-between">
@@ -415,17 +485,20 @@ function renderContas(){
           </div>
           <button class="del-btn" onclick="excluirConta('${c.id}')">✕</button>
         </div>
-        <div class="value" style="margin-top:10px">${brl(c.saldo||0)}</div>
+        <div class="value" style="margin-top:10px; ${saldo<0?'color:var(--terracota)':''}">${brl(saldo)}</div>
         ${c.temLimite ? `
-          <div class="barra"><div class="barra-fill" style="width:${usoLimite*100}%"></div></div>
-          <div class="muted" style="margin-top:6px">Limite de cheque especial: ${brl(c.limite||0)}</div>
+          <div class="muted" style="margin-top:8px">Limite de cheque especial: <span class="mono">${brl(limite)}</span></div>
+          ${usandoLimite ? `
+            <div class="barra" style="margin-top:8px"><div class="barra-fill" style="width:${usoRatio*100}%; background:var(--terracota)"></div></div>
+            <div class="muted" style="margin-top:6px">Limite usado: <span class="mono">${brl(limiteUsado)}</span> · disponível: <span class="mono">${brl(limiteDisponivel)}</span></div>
+          ` : ''}
         ` : ''}
       </div>`;
     }).join('');
   }
 
-  const totalDisponivel = contas.reduce((s,c)=> s + (c.saldo||0) + (c.temLimite ? (c.limite||0) : 0), 0);
-  document.getElementById('contas-disponivel-total').textContent = brl(totalDisponivel);
+  const totalSaldo = contas.reduce((s,c)=> s + (c.saldo||0), 0);
+  document.getElementById('contas-disponivel-total').textContent = brl(totalSaldo);
 }
 
 window.excluirConta = async function(id){
@@ -515,6 +588,16 @@ function formatarData(iso){
 }
 
 // ---------- Home ----------
+const FRASES_INVESTIMENTO = [
+  "O melhor momento para investir foi ontem. O segundo melhor é hoje.",
+  "Não é sobre quanto você ganha, é sobre quanto você guarda.",
+  "Pequenas quantias investidas com constância viram grandes números com tempo.",
+  "Cada real guardado hoje é uma opção a mais no futuro.",
+  "Disciplina financeira é o investimento que nunca desvaloriza."
+];
+
+const CORES_CATEGORIA = ['#2E3648','#B5645A','#B9A06B','#6E9B7B','#8A8F9C','#7A8CA8'];
+
 function renderHome(){
   const hoje = new Date();
   document.getElementById('home-date').textContent = hoje.toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long' }).toUpperCase();
@@ -524,19 +607,30 @@ function renderHome(){
   const doMesReal = despesas.filter(d => (d.vencimento||'').startsWith(chaveMesAtualReal));
   const totalSaidas = doMesReal.reduce((s,d)=> s + (d.valor||0), 0);
   const saldoContas = contas.reduce((s,c)=> s + (c.saldo||0), 0);
-  // "Entradas" não tem cadastro próprio ainda neste MVP — usamos o saldo das contas como base do saldo projetado.
-  const saldoProjetado = saldoContas - doMesReal.filter(d=>!d.pago).reduce((s,d)=>s+(d.valor||0),0);
+  const faltaPagarValor = doMesReal.filter(d=>!d.pago).reduce((s,d)=>s+(d.valor||0),0);
+  const saldoProjetado = saldoContas - faltaPagarValor;
 
   document.getElementById('home-saldo-projetado').textContent = brl(saldoProjetado);
   document.getElementById('home-entradas-saidas').textContent = `Saldo em contas ${brl(saldoContas)} · Saídas do mês ${brl(totalSaidas)}`;
 
-  const pagas = doMesReal.filter(d=>d.pago).length;
-  document.getElementById('home-contas-pagas').textContent = `${pagas}/${doMesReal.length} pagas`;
-  const faltaPagar = doMesReal.filter(d=>!d.pago).reduce((s,d)=>s+(d.valor||0),0);
-  document.getElementById('home-falta-pagar').textContent = doMesReal.length
-    ? `Faltam ${doMesReal.length - pagas} · ${brl(faltaPagar)} ainda a pagar este mês`
-    : 'Nenhuma despesa cadastrada ainda';
+  // --- Alerta de risco ---
+  const alertaEl = document.getElementById('home-alerta');
+  const limiteTotal = contas.reduce((s,c)=> s + (c.temLimite ? (c.limite||0) : 0), 0);
+  if (saldoProjetado >= 0){
+    alertaEl.classList.add('ok');
+    document.getElementById('home-alerta-titulo').textContent = '✓ Tudo tranquilo';
+    document.getElementById('home-alerta-titulo').style.color = '';
+    document.getElementById('home-alerta-texto').textContent =
+      `Nas contas atuais, você fecha o mês positivo em ${brl(saldoProjetado)} — sem precisar resgatar investimento.`;
+  } else {
+    alertaEl.classList.remove('ok');
+    document.getElementById('home-alerta-titulo').textContent = '⚠ Atenção ao fim do mês';
+    document.getElementById('home-alerta-texto').textContent = Math.abs(saldoProjetado) <= limiteTotal
+      ? `Você pode fechar negativo em ${brl(Math.abs(saldoProjetado))} — dentro do limite de cheque especial disponível.`
+      : `Você pode fechar negativo em ${brl(Math.abs(saldoProjetado))} — considere resgatar algum investimento pra cobrir a diferença.`;
+  }
 
+  // --- Próximos vencimentos ---
   const proximas = doMesReal.filter(d=>!d.pago).sort((a,b)=>(a.vencimento||'').localeCompare(b.vencimento||'')).slice(0,4);
   const elV = document.getElementById('home-vencimentos');
   elV.innerHTML = proximas.length ? proximas.map(d => `
@@ -548,6 +642,62 @@ function renderHome(){
       <div class="despesa-valor ${d.tipo==='Fixa'?'fixa':'variavel'}">${brl(d.valor||0)}</div>
     </div>
   `).join('') : '<p class="empty-hint">Nada por aqui ainda</p>';
+
+  // --- Frase motivacional (aleatória a cada abertura) ---
+  document.getElementById('home-quote').innerHTML =
+    `“${window.__fraseDoDia}”<span class="fonte">atualiza a cada abertura do app</span>`;
+
+  // --- Anel de progresso: contas pagas ---
+  const pagas = doMesReal.filter(d=>d.pago).length;
+  const total = doMesReal.length;
+  const frac = total ? pagas/total : 0;
+  const circ = 226; // 2 * PI * 36
+  document.getElementById('home-ring').setAttribute('stroke-dashoffset', circ - circ*frac);
+  document.getElementById('home-ring-text').textContent = `${pagas}/${total}`;
+  document.getElementById('home-faltam-contas').textContent = total ? `Faltam ${total-pagas} contas` : 'Nenhuma conta este mês';
+  document.getElementById('home-falta-pagar').textContent = total
+    ? `${brl(faltaPagarValor)} ainda a pagar este mês, entre fixas e variáveis.`
+    : 'Nenhuma despesa cadastrada ainda';
+
+  // --- Gastos por categoria (mês atual, maior para menor) ---
+  const porCategoria = {};
+  doMesReal.forEach(d => { porCategoria[d.categoria] = (porCategoria[d.categoria]||0) + (d.valor||0); });
+  const catsOrdenadas = Object.entries(porCategoria).sort((a,b)=> b[1]-a[1]);
+  const totalCat = catsOrdenadas.reduce((s,[,v])=> s+v, 0);
+  const barEl = document.getElementById('home-cat-bar');
+  const legEl = document.getElementById('home-cat-legenda');
+  if (catsOrdenadas.length === 0){
+    barEl.style.display = 'none';
+    legEl.innerHTML = '<p class="empty-hint">Nenhum gasto registrado este mês</p>';
+  } else {
+    barEl.style.display = 'flex';
+    barEl.innerHTML = catsOrdenadas.map(([nome,val],i) =>
+      `<div style="width:${(val/totalCat*100)}%; background:${CORES_CATEGORIA[i % CORES_CATEGORIA.length]}"></div>`
+    ).join('');
+    legEl.innerHTML = catsOrdenadas.map(([nome,val],i) => `
+      <div class="cat-legenda-item">
+        <span class="dot" style="background:${CORES_CATEGORIA[i % CORES_CATEGORIA.length]}"></span>
+        <span class="nome">${nome}</span>
+        <span class="pct">${Math.round(val/totalCat*100)}%</span>
+      </div>
+    `).join('');
+  }
+
+  // --- Comparativo com mês anterior ---
+  const mesAnterior = new Date(); mesAnterior.setMonth(mesAnterior.getMonth()-1);
+  const chaveAnterior = mesChave(mesAnterior);
+  const totalAnterior = despesas.filter(d => (d.vencimento||'').startsWith(chaveAnterior)).reduce((s,d)=>s+(d.valor||0),0);
+  const compTituloEl = document.getElementById('home-comp-titulo');
+  const compTextoEl = document.getElementById('home-comp-texto');
+  if (totalAnterior === 0){
+    compTituloEl.textContent = 'Ainda sem dados do mês anterior';
+    compTextoEl.textContent = `Este mês: ${brl(totalSaidas)}`;
+  } else {
+    const variacao = ((totalSaidas - totalAnterior)/totalAnterior)*100;
+    const subiu = variacao >= 0;
+    compTituloEl.innerHTML = `<span class="mono" style="color:${subiu?'var(--terracota)':'var(--green)'}">${subiu?'↑':'↓'} ${Math.abs(variacao).toFixed(1)}%</span> ${subiu?'a mais':'a menos'} em gastos`;
+    compTextoEl.textContent = `Mês anterior: ${brl(totalAnterior)}  ·  Este mês: ${brl(totalSaidas)}`;
+  }
 }
 
 function saudacao(){
@@ -556,6 +706,7 @@ function saudacao(){
   if (h < 18) return 'Boa tarde';
   return 'Boa noite';
 }
+window.__fraseDoDia = FRASES_INVESTIMENTO[Math.floor(Math.random()*FRASES_INVESTIMENTO.length)];
 
 // ---------- Firestore listeners ----------
 onSnapshot(query(collection(db, 'contas'), orderBy('criadoEm','asc')), snap => {
