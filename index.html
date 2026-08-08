@@ -244,12 +244,18 @@
     <div id="lista-contas"><p class="empty-hint">Nenhuma conta cadastrada ainda</p></div>
     <button class="btn btn-outline" onclick="abrirFormConta()">+ &nbsp;Nova conta</button>
 
-    <div class="section-title" style="margin-top:26px">Despesas</div>
+    <div class="section-title" style="margin-top:26px">Movimentação do mês</div>
     <div class="month-switch">
       <button onclick="mudarMes(-1)">‹</button>
       <span class="label" id="mes-label">—</span>
       <button onclick="mudarMes(1)">›</button>
     </div>
+
+    <div class="section-title">Entradas</div>
+    <div id="lista-entradas"><p class="empty-hint">Nenhuma entrada neste mês</p></div>
+    <button class="btn btn-outline" onclick="abrirFormEntrada()">+ &nbsp;Nova entrada</button>
+
+    <div class="section-title" style="margin-top:22px">Despesas</div>
     <div id="lista-despesas"><p class="empty-hint">Nenhuma despesa neste mês</p></div>
     <button class="btn btn-primary" onclick="abrirFormDespesa()">+ &nbsp;Nova despesa</button>
   </main>
@@ -276,6 +282,12 @@
       <div class="cat-bar" id="invest-seg-bar"></div>
       <div id="invest-seg-legenda" style="margin-top:12px"></div>
     </div>
+
+    <div class="section-title" style="margin-top:26px">Ranking de retorno</div>
+    <div id="invest-ranking"><p class="empty-hint">Cadastre ações, FIIs ou cripto pra ver o ranking</p></div>
+
+    <div class="section-title">Sugestões da carteira</div>
+    <div id="invest-sugestoes"><p class="empty-hint">Sem sugestões por enquanto</p></div>
 
     <div class="section-title row-between" style="align-items:center">
       <span>Posições cadastradas</span>
@@ -403,6 +415,45 @@
         <input type="date" id="despesa-vencimento" required>
       </div>
       <button class="btn btn-primary" type="submit">Salvar despesa</button>
+    </form>
+  </div>
+</div>
+
+<!-- ===== FORM: NOVA ENTRADA ===== -->
+<div class="overlay" id="overlay-entrada">
+  <div class="sheet">
+    <div class="sheet-header">
+      <button onclick="fecharForm('overlay-entrada')">←</button>
+      <h2>Nova entrada</h2>
+    </div>
+    <form id="form-entrada" onsubmit="salvarEntrada(event)">
+      <div class="campo">
+        <label>Nome</label>
+        <input type="text" id="entrada-nome" placeholder="Ex: Salário de setembro" required>
+      </div>
+      <div class="campo">
+        <label>Valor</label>
+        <input type="number" step="0.01" id="entrada-valor" placeholder="0,00" required>
+      </div>
+      <div class="campo">
+        <label>Categoria</label>
+        <select id="entrada-categoria">
+          <option>Salário</option>
+          <option>Aluguel</option>
+          <option>Rendimentos</option>
+          <option>Outros</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label>Conta que recebeu</label>
+        <select id="entrada-conta"></select>
+      </div>
+      <div class="campo">
+        <label>Data</label>
+        <input type="date" id="entrada-data" required>
+      </div>
+      <div class="hint muted" style="margin:-8px 2px 16px">O valor entra automaticamente no saldo da conta selecionada.</div>
+      <button class="btn btn-primary" type="submit">Salvar entrada</button>
     </form>
   </div>
 </div>
@@ -566,6 +617,7 @@ const db = getFirestore(app);
 let contas = [];
 let despesas = [];
 let investimentos = [];
+let entradas = [];
 let mesAtual = new Date(); // mês sendo visualizado na aba Contas
 
 // ---------- Navegação ----------
@@ -587,6 +639,11 @@ window.abrirFormConta = function(){ document.getElementById('overlay-conta').cla
 window.abrirFormDespesa = function(){
   preencherSelectContas();
   document.getElementById('overlay-despesa').classList.add('open');
+};
+window.abrirFormEntrada = function(){
+  const sel = document.getElementById('entrada-conta');
+  sel.innerHTML = contas.map(c => `<option value="${c.id}">${c.nome}</option>`).join('') || '<option value="">Nenhuma conta cadastrada</option>';
+  document.getElementById('overlay-entrada').classList.add('open');
 };
 window.fecharForm = function(id){ document.getElementById(id).classList.remove('open'); };
 
@@ -787,6 +844,38 @@ window.excluirDespesa = async function(id){
   toast('Despesa excluída');
 };
 
+// ---------- Entradas ----------
+window.salvarEntrada = async function(e){
+  e.preventDefault();
+  const nome = document.getElementById('entrada-nome').value.trim();
+  const valor = parseFloat(document.getElementById('entrada-valor').value || 0);
+  const categoria = document.getElementById('entrada-categoria').value;
+  const contaId = document.getElementById('entrada-conta').value;
+  const contaObj = contas.find(c => c.id === contaId);
+  const data = document.getElementById('entrada-data').value;
+  try{
+    await addDoc(collection(db, 'entradas'), {
+      nome, valor, categoria, contaId, contaNome: contaObj ? contaObj.nome : '',
+      data, criadoEm: serverTimestamp()
+    });
+    if (contaObj){
+      await updateDoc(doc(db, 'contas', contaId), { saldo: (contaObj.saldo||0) + valor });
+    }
+    toast('Entrada salva!');
+    document.getElementById('form-entrada').reset();
+    fecharForm('overlay-entrada');
+  }catch(err){
+    console.error(err);
+    toast('Erro ao salvar. Veja o console.');
+  }
+};
+
+window.excluirEntrada = async function(id){
+  if (!confirm('Excluir esta entrada? (o valor não será removido do saldo automaticamente)')) return;
+  await deleteDoc(doc(db, 'entradas', id));
+  toast('Entrada excluída');
+};
+
 window.mudarMes = function(delta){
   mesAtual.setMonth(mesAtual.getMonth() + delta);
   mesAtual = new Date(mesAtual);
@@ -819,7 +908,29 @@ function renderDespesas(){
     `).join('');
   }
 
+  renderEntradas();
   renderHome(); // home depende do estado global de despesas/contas também
+}
+
+function renderEntradas(){
+  const elEntradas = document.getElementById('lista-entradas');
+  if (!elEntradas) return;
+  const chave = mesChave(mesAtual);
+  const doMes = entradas.filter(en => (en.data||'').startsWith(chave)).sort((a,b)=> (a.data||'').localeCompare(b.data||''));
+  if (doMes.length === 0){
+    elEntradas.innerHTML = '<p class="empty-hint">Nenhuma entrada neste mês</p>';
+  } else {
+    elEntradas.innerHTML = doMes.map(en => `
+      <div class="despesa-item">
+        <div class="despesa-info">
+          <div class="despesa-nome">${en.nome}</div>
+          <div class="despesa-sub">${en.categoria} · ${en.contaNome || 'sem conta'} · ${formatarData(en.data)}</div>
+        </div>
+        <div class="despesa-valor" style="color:var(--green)">+${brl(en.valor||0)}</div>
+        <button class="del-btn" onclick="excluirEntrada('${en.id}')">✕</button>
+      </div>
+    `).join('');
+  }
 }
 
 function formatarData(iso){
@@ -1103,10 +1214,75 @@ function renderInvestimentos(){
   }
 
   renderPatrimonio();
+  renderRankingESugestoes();
 }
 
-// ---------- Patrimônio (contas + investimentos) ----------
-const CORES_TIPO_PATRIMONIO = { 'Contas correntes':'#7A8CA8', 'Investimentos':'#B9A06B' };
+// ---------- Ranking de retorno e sugestões da carteira ----------
+function renderRankingESugestoes(){
+  const rankingEl = document.getElementById('invest-ranking');
+  const sugestoesEl = document.getElementById('invest-sugestoes');
+  if (!rankingEl || !sugestoesEl) return;
+
+  // só entram no ranking ativos com variação calculável (Renda Variável e Cripto com quantidade)
+  const comRetorno = investimentos
+    .filter(inv => (inv.tipo === 'Renda Variável' || inv.tipo === 'Cripto') && inv.quantidade)
+    .map(inv => {
+      const valorAtual = valorAtualInvestimento(inv);
+      const custo = custoInvestimento(inv);
+      const variacao = custo > 0 ? ((valorAtual-custo)/custo*100) : 0;
+      return { inv, valorAtual, custo, variacao };
+    })
+    .sort((a,b) => b.variacao - a.variacao);
+
+  if (comRetorno.length === 0){
+    rankingEl.innerHTML = '<p class="empty-hint">Cadastre ações, FIIs ou cripto pra ver o ranking</p>';
+  } else {
+    rankingEl.innerHTML = `<div class="card">` + comRetorno.map((r,i) => `
+      <div class="row-between" style="padding:8px 0; ${i>0 ? 'border-top:1px solid var(--line)' : ''}">
+        <div>
+          <div style="font-weight:500; font-size:13.5px">${i+1}º · ${r.inv.nomeAtivo}${r.inv.ticker ? ' ('+r.inv.ticker+')' : r.inv.simbolo ? ' ('+r.inv.simbolo+')' : ''}</div>
+          <div class="muted" style="margin-top:2px">${r.inv.instituicao}</div>
+        </div>
+        <div class="mono" style="color:${r.variacao>=0?'var(--green)':'var(--terracota)'}; font-size:13.5px">${r.variacao>=0?'↑':'↓'} ${Math.abs(r.variacao).toFixed(1)}%</div>
+      </div>
+    `).join('') + `</div>`;
+  }
+
+  // --- Sugestões heurísticas (não é recomendação financeira, só sinalização) ---
+  const sugestoes = [];
+  const totalCarteira = investimentos.reduce((s,inv)=> s + valorAtualInvestimento(inv), 0);
+
+  comRetorno.forEach(r => {
+    if (r.variacao <= -15){
+      sugestoes.push({ tipo:'queda', texto:`${r.inv.nomeAtivo} está ${Math.abs(r.variacao).toFixed(1)}% abaixo do preço médio — pode valer reavaliar se a tese ainda se sustenta.` });
+    }
+    if (r.variacao >= 30){
+      sugestoes.push({ tipo:'alta', texto:`${r.inv.nomeAtivo} subiu ${r.variacao.toFixed(1)}% acima do preço médio — considere realizar parte do lucro.` });
+    }
+    if (totalCarteira > 0 && (r.valorAtual/totalCarteira) > 0.30){
+      sugestoes.push({ tipo:'concentracao', texto:`${r.inv.nomeAtivo} já representa ${(r.valorAtual/totalCarteira*100).toFixed(0)}% da carteira de investimentos — concentração alta num único ativo.` });
+    }
+  });
+
+  // concentração por segmento
+  const porSeg = {};
+  investimentos.forEach(inv => { porSeg[segmentoDe(inv)] = (porSeg[segmentoDe(inv)]||0) + valorAtualInvestimento(inv); });
+  Object.entries(porSeg).forEach(([seg,val]) => {
+    if (totalCarteira > 0 && (val/totalCarteira) > 0.70){
+      sugestoes.push({ tipo:'rebalanceamento', texto:`${seg} concentra ${(val/totalCarteira*100).toFixed(0)}% da carteira — pode valer diversificar mais entre os segmentos.` });
+    }
+  });
+
+  if (sugestoes.length === 0){
+    sugestoesEl.innerHTML = '<p class="empty-hint">Nenhum alerta no momento — carteira parece equilibrada</p>';
+  } else {
+    sugestoesEl.innerHTML = sugestoes.map(s => `
+      <div class="card" style="border-color:${s.tipo==='alta'?'var(--green)':'var(--gold)'}">
+        <div class="muted" style="line-height:1.5">${s.texto}</div>
+      </div>
+    `).join('') + `<div class="hint muted" style="padding:4px 2px">Sinalização automática por regras simples — não é recomendação de investimento.</div>`;
+  }
+}
 
 function renderPatrimonio(){
   const totalEl = document.getElementById('patrimonio-total');
@@ -1159,12 +1335,13 @@ function renderHome(){
   const chaveMesAtualReal = mesChave(new Date());
   const doMesReal = despesas.filter(d => (d.vencimento||'').startsWith(chaveMesAtualReal));
   const totalSaidas = doMesReal.reduce((s,d)=> s + (d.valor||0), 0);
+  const totalEntradasMes = entradas.filter(en => (en.data||'').startsWith(chaveMesAtualReal)).reduce((s,en)=> s + (en.valor||0), 0);
   const saldoContas = contas.reduce((s,c)=> s + (c.saldo||0), 0);
   const faltaPagarValor = doMesReal.filter(d=>!d.pago).reduce((s,d)=>s+(d.valor||0),0);
   const saldoProjetado = saldoContas - faltaPagarValor;
 
   document.getElementById('home-saldo-projetado').textContent = brl(saldoProjetado);
-  document.getElementById('home-entradas-saidas').textContent = `Saldo em contas ${brl(saldoContas)} · Saídas do mês ${brl(totalSaidas)}`;
+  document.getElementById('home-entradas-saidas').textContent = `Entradas ${brl(totalEntradasMes)} · Saídas do mês ${brl(totalSaidas)}`;
 
   // --- Alerta de risco ---
   const alertaEl = document.getElementById('home-alerta');
@@ -1272,6 +1449,12 @@ onSnapshot(query(collection(db, 'contas'), orderBy('criadoEm','asc')), snap => {
 onSnapshot(query(collection(db, 'despesas'), orderBy('vencimento','asc')), snap => {
   despesas = snap.docs.map(d => ({ id:d.id, ...d.data() }));
   renderDespesas();
+});
+
+onSnapshot(query(collection(db, 'entradas'), orderBy('data','asc')), snap => {
+  entradas = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+  renderEntradas();
+  renderHome();
 });
 
 onSnapshot(query(collection(db, 'investimentos'), orderBy('criadoEm','asc')), snap => {
