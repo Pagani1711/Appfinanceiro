@@ -460,7 +460,7 @@
         <label>Data</label>
         <input type="date" id="entrada-data" required>
       </div>
-      <div class="hint muted" style="margin:-8px 2px 16px">O valor entra automaticamente no saldo da conta selecionada.</div>
+      <div class="hint muted" style="margin:-8px 2px 16px">O valor só entra no saldo da conta depois que você marcar como recebida na lista.</div>
       <button class="btn btn-primary" type="submit">Salvar receita</button>
     </form>
   </div>
@@ -865,12 +865,9 @@ window.salvarEntrada = async function(e){
   try{
     await addDoc(collection(db, 'entradas'), {
       nome, valor, categoria, tipo, contaId, contaNome: contaObj ? contaObj.nome : '',
-      data, criadoEm: serverTimestamp()
+      data, recebido:false, criadoEm: serverTimestamp()
     });
-    if (contaObj){
-      await updateDoc(doc(db, 'contas', contaId), { saldo: (contaObj.saldo||0) + valor });
-    }
-    toast('Receita salva!');
+    toast('Receita salva! Marque como recebida quando o valor cair na conta.');
     document.getElementById('form-entrada').reset();
     fecharForm('overlay-entrada');
   }catch(err){
@@ -879,8 +876,23 @@ window.salvarEntrada = async function(e){
   }
 };
 
+window.toggleRecebido = async function(id, atual, contaId, valor){
+  try{
+    await updateDoc(doc(db, 'entradas', id), { recebido: !atual });
+    const contaObj = contas.find(c => c.id === contaId);
+    if (contaObj){
+      const novoSaldo = (contaObj.saldo||0) + (atual ? -valor : valor); // desmarcar remove, marcar soma
+      await updateDoc(doc(db, 'contas', contaId), { saldo: novoSaldo });
+    }
+  }catch(err){
+    console.error(err);
+    toast('Erro ao atualizar. Veja o console.');
+  }
+};
+
 window.excluirEntrada = async function(id){
-  if (!confirm('Excluir esta receita? (o valor não será removido do saldo automaticamente)')) return;
+  const en = entradas.find(e => e.id === id);
+  if (!confirm('Excluir esta receita?' + (en && en.recebido ? ' O valor já somado no saldo não será removido automaticamente.' : ''))) return;
   await deleteDoc(doc(db, 'entradas', id));
   toast('Receita excluída');
 };
@@ -930,7 +942,8 @@ function renderEntradas(){
     elEntradas.innerHTML = '<p class="empty-hint">Nenhuma receita neste mês</p>';
   } else {
     elEntradas.innerHTML = doMes.map(en => `
-      <div class="despesa-item">
+      <div class="despesa-item ${en.recebido ? 'paga' : ''}">
+        <div class="check ${en.recebido ? 'on' : ''}" onclick="toggleRecebido('${en.id}', ${en.recebido}, '${en.contaId||''}', ${en.valor||0})">${en.recebido ? '✓' : ''}</div>
         <div class="despesa-info">
           <div class="despesa-nome">${en.nome}</div>
           <div class="despesa-sub">${en.categoria}${en.tipo ? ' · '+en.tipo : ''} · ${en.contaNome || 'sem conta'} · ${formatarData(en.data)}</div>
@@ -1344,7 +1357,7 @@ function renderHome(){
   const chaveMesAtualReal = mesChave(new Date());
   const doMesReal = despesas.filter(d => (d.vencimento||'').startsWith(chaveMesAtualReal));
   const totalSaidas = doMesReal.reduce((s,d)=> s + (d.valor||0), 0);
-  const totalEntradasMes = entradas.filter(en => (en.data||'').startsWith(chaveMesAtualReal)).reduce((s,en)=> s + (en.valor||0), 0);
+  const totalEntradasMes = entradas.filter(en => (en.data||'').startsWith(chaveMesAtualReal) && en.recebido).reduce((s,en)=> s + (en.valor||0), 0);
   const saldoContas = contas.reduce((s,c)=> s + (c.saldo||0), 0);
   const faltaPagarValor = doMesReal.filter(d=>!d.pago).reduce((s,d)=>s+(d.valor||0),0);
   const saldoProjetado = saldoContas - faltaPagarValor;
