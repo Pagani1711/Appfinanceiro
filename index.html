@@ -403,8 +403,9 @@
         <input type="text" id="lanc-descricao" placeholder="Ex: Panvel Farmácias" required>
       </div>
       <div class="campo">
-        <label>Valor</label>
+        <label id="lanc-valor-label">Valor</label>
         <input type="number" step="0.01" id="lanc-valor" placeholder="0,00" required>
+        <div class="hint muted" id="lanc-valor-hint" style="margin-top:6px; display:none">Informe o valor TOTAL da compra — o app divide pelas parcelas automaticamente.</div>
       </div>
       <div class="campo">
         <label>Data da compra</label>
@@ -429,6 +430,14 @@
           <option>Reembolsável Trabalho</option>
           <option>Outros</option>
         </select>
+      </div>
+      <div class="campo">
+        <label>Tipo</label>
+        <div class="seg">
+          <button type="button" class="active" data-val="Variável" onclick="toggleSeg(this)">Variável</button>
+          <button type="button" data-val="Fixa" onclick="toggleSeg(this)">Fixa/Assinatura</button>
+        </div>
+        <input type="hidden" id="lanc-tipo" value="Variável">
       </div>
       <div class="campo">
         <label>É parcelado?</label>
@@ -509,7 +518,7 @@
   <div class="sheet">
     <div class="sheet-header">
       <button onclick="fecharForm('overlay-despesa')">←</button>
-      <h2>Nova despesa</h2>
+      <h2 id="despesa-sheet-title">Nova despesa</h2>
     </div>
     <form id="form-despesa" onsubmit="salvarDespesa(event)">
       <div class="campo">
@@ -556,7 +565,7 @@
         <label>Data de vencimento</label>
         <input type="date" id="despesa-vencimento" required>
       </div>
-      <button class="btn btn-primary" type="submit">Salvar despesa</button>
+      <button class="btn btn-primary" type="submit" id="despesa-submit-btn">Salvar despesa</button>
     </form>
   </div>
 </div>
@@ -791,8 +800,32 @@ window.toggleSeg = function(btn){
 };
 
 window.abrirFormConta = function(){ document.getElementById('overlay-conta').classList.add('open'); };
-window.abrirFormDespesa = function(){
+let despesaEditandoId = null;
+
+window.abrirFormDespesa = function(id){
   preencherSelectContas();
+  document.getElementById('form-despesa').reset();
+  despesaEditandoId = id || null;
+
+  if (id){
+    const d = despesas.find(x => x.id === id);
+    if (!d) return;
+    document.getElementById('despesa-sheet-title').textContent = 'Editar despesa';
+    document.getElementById('despesa-submit-btn').textContent = 'Salvar alterações';
+    document.getElementById('despesa-nome').value = d.nome || '';
+    document.getElementById('despesa-valor').value = d.valor || '';
+    document.getElementById('despesa-categoria').value = d.categoria || 'Outros';
+    if (d.contaId) document.getElementById('despesa-conta').value = d.contaId;
+    document.getElementById('despesa-vencimento').value = d.vencimento || '';
+    const tipoBtn = document.querySelector('#form-despesa .seg [data-val="'+d.tipo+'"]');
+    if (tipoBtn) toggleSeg(tipoBtn);
+  } else {
+    document.getElementById('despesa-sheet-title').textContent = 'Nova despesa';
+    document.getElementById('despesa-submit-btn').textContent = 'Salvar despesa';
+    const tipoBtn = document.querySelector('#form-despesa .seg [data-val="Fixa"]');
+    if (tipoBtn) toggleSeg(tipoBtn);
+  }
+
   document.getElementById('overlay-despesa').classList.add('open');
 };
 window.abrirFormEntrada = function(){
@@ -811,6 +844,8 @@ window.toggleParcelado = function(btn){
   const sim = btn.dataset.val === 'sim';
   document.getElementById('lanc-parcela-atual-campo').style.display = sim ? '' : 'none';
   document.getElementById('lanc-parcela-total-campo').style.display = sim ? '' : 'none';
+  document.getElementById('lanc-valor-label').textContent = sim ? 'Valor total da compra' : 'Valor';
+  document.getElementById('lanc-valor-hint').style.display = sim ? '' : 'none';
 };
 
 let investimentoEditandoId = null;
@@ -977,6 +1012,55 @@ function preencherSelectContas(){
 }
 
 // ---------- Despesas ----------
+// Gera cópias futuras de um lançamento fixo (despesa ou receita), repetindo mês a mês
+async function gerarRecorrencia(colecaoNome, dadosBase, campoData, mesesFuturos){
+  const dataBase = new Date(dadosBase[campoData] + 'T00:00:00');
+  const diaOriginal = dataBase.getDate();
+  for (let i=1; i<=mesesFuturos; i++){
+    const d = new Date(dataBase.getFullYear(), dataBase.getMonth()+i, diaOriginal);
+    // se o mês não tem esse dia (ex: 31 em mês de 30), volta pro último dia do mês
+    if (d.getDate() !== diaOriginal) d.setDate(0);
+    const iso = d.toISOString().slice(0,10);
+    const novoDoc = { ...dadosBase, [campoData]: iso, criadoEm: serverTimestamp() };
+    if (colecaoNome === 'despesas') novoDoc.pago = false;
+    if (colecaoNome === 'entradas') novoDoc.recebido = false;
+    await addDoc(collection(db, colecaoNome), novoDoc);
+  }
+}
+const MESES_RECORRENCIA = 11; // gera 11 meses futuros de cara (1 ano junto com o mês atual)
+
+// ---------- Auto-extensão de recorrências (mantém a série "fixa" rodando pra sempre) ----------
+const MESES_BUFFER_MINIMO = 6;  // se sobrar menos que isso de meses futuros já gerados, estende
+const MESES_EXTENSAO = 12;      // quantos meses adiciona de cada vez
+let recorrenciasEmExtensao = new Set();
+
+async function manterRecorrenciasEmDia(lista, colecaoNome, campoData){
+  const grupos = {};
+  lista.forEach(item => {
+    if (!item.recorrenciaId) return;
+    (grupos[item.recorrenciaId] = grupos[item.recorrenciaId] || []).push(item);
+  });
+  const hoje = new Date();
+  for (const [recId, itens] of Object.entries(grupos)){
+    if (recorrenciasEmExtensao.has(recId)) continue;
+    const datas = itens.map(it => new Date(it[campoData] + 'T00:00:00').getTime());
+    const maxData = new Date(Math.max(...datas));
+    const mesesAFrente = (maxData.getFullYear()-hoje.getFullYear())*12 + (maxData.getMonth()-hoje.getMonth());
+    if (mesesAFrente < MESES_BUFFER_MINIMO){
+      recorrenciasEmExtensao.add(recId);
+      const ultimoItem = itens.find(it => new Date(it[campoData] + 'T00:00:00').getTime() === maxData.getTime());
+      const dadosBase = { ...ultimoItem };
+      delete dadosBase.id;
+      delete dadosBase.criadoEm;
+      try{
+        await gerarRecorrencia(colecaoNome, dadosBase, campoData, MESES_EXTENSAO);
+      } finally {
+        recorrenciasEmExtensao.delete(recId);
+      }
+    }
+  }
+}
+
 window.salvarDespesa = async function(e){
   e.preventDefault();
   const nome = document.getElementById('despesa-nome').value.trim();
@@ -986,14 +1070,26 @@ window.salvarDespesa = async function(e){
   const contaObj = contas.find(c => c.id === contaId);
   const tipo = document.getElementById('despesa-tipo').value;
   const vencimento = document.getElementById('despesa-vencimento').value; // YYYY-MM-DD
+  const dados = { nome, valor, categoria, contaId, contaNome: contaObj ? contaObj.nome : '', tipo, vencimento };
+  const editando = !!despesaEditandoId;
   try{
-    await addDoc(collection(db, 'despesas'), {
-      nome, valor, categoria, contaId, contaNome: contaObj ? contaObj.nome : '',
-      tipo, vencimento, pago:false, criadoEm: serverTimestamp()
-    });
-    toast('Despesa salva!');
+    if (editando){
+      await updateDoc(doc(db, 'despesas', despesaEditandoId), dados);
+      toast('Despesa atualizada!');
+    } else {
+      if (tipo === 'Fixa'){
+        const recorrenciaId = 'r' + Date.now() + Math.random().toString(36).slice(2,8);
+        await addDoc(collection(db, 'despesas'), { ...dados, pago:false, recorrenciaId, criadoEm: serverTimestamp() });
+        await gerarRecorrencia('despesas', { ...dados, pago:false, recorrenciaId }, 'vencimento', MESES_RECORRENCIA);
+        toast('Despesa salva — vai se repetir todo mês automaticamente, sem limite.');
+      } else {
+        await addDoc(collection(db, 'despesas'), { ...dados, pago:false, criadoEm: serverTimestamp() });
+        toast('Despesa salva!');
+      }
+    }
     document.getElementById('form-despesa').reset();
     fecharForm('overlay-despesa');
+    despesaEditandoId = null;
   }catch(err){
     console.error(err);
     toast('Erro ao salvar. Veja o console.');
@@ -1007,6 +1103,8 @@ window.togglePago = async function(id, atual, contaId, valor){
     if (contaObj){
       const novoSaldo = (contaObj.saldo||0) + (atual ? valor : -valor); // desmarcar devolve, marcar subtrai
       await updateDoc(doc(db, 'contas', contaId), { saldo: novoSaldo });
+    } else {
+      toast('Conta vinculada não existe mais — edite a despesa e escolha outra conta');
     }
   }catch(err){
     console.error(err);
@@ -1030,12 +1128,17 @@ window.salvarEntrada = async function(e){
   const contaId = document.getElementById('entrada-conta').value;
   const contaObj = contas.find(c => c.id === contaId);
   const data = document.getElementById('entrada-data').value;
+  const dadosBase = { nome, valor, categoria, tipo, contaId, contaNome: contaObj ? contaObj.nome : '', data };
   try{
-    await addDoc(collection(db, 'entradas'), {
-      nome, valor, categoria, tipo, contaId, contaNome: contaObj ? contaObj.nome : '',
-      data, recebido:false, criadoEm: serverTimestamp()
-    });
-    toast('Receita salva! Marque como recebida quando o valor cair na conta.');
+    if (tipo === 'Fixa'){
+      const recorrenciaId = 'r' + Date.now() + Math.random().toString(36).slice(2,8);
+      await addDoc(collection(db, 'entradas'), { ...dadosBase, recebido:false, recorrenciaId, criadoEm: serverTimestamp() });
+      await gerarRecorrencia('entradas', { ...dadosBase, recebido:false, recorrenciaId }, 'data', MESES_RECORRENCIA);
+      toast('Receita salva — vai se repetir todo mês automaticamente, sem limite.');
+    } else {
+      await addDoc(collection(db, 'entradas'), { ...dadosBase, recebido:false, criadoEm: serverTimestamp() });
+      toast('Receita salva! Marque como recebida quando o valor cair na conta.');
+    }
     document.getElementById('form-entrada').reset();
     fecharForm('overlay-entrada');
   }catch(err){
@@ -1081,10 +1184,27 @@ function renderDespesas(){
   const doMes = despesas.filter(d => (d.vencimento||'').startsWith(chave)).sort((a,b)=> (a.vencimento||'').localeCompare(b.vencimento||''));
 
   const el = document.getElementById('lista-despesas');
-  if (doMes.length === 0){
+  let html = '';
+
+  // faturas de cartão que vencem neste mês entram como linha informativa (só leitura aqui — edite em Cartões)
+  cartoes.forEach(cart => {
+    const total = totalFaturaDe(cart.id, chave);
+    if (total > 0){
+      html += `
+      <div class="despesa-item" style="cursor:pointer" onclick="mudarView('cartoes'); abrirFaturaNoMes('${cart.id}', '${chave}')">
+        <div class="despesa-info">
+          <div class="despesa-nome">💳 Fatura ${cart.nome}</div>
+          <div class="despesa-sub">Cartão de crédito · vence dia ${cart.diaVencimento}</div>
+        </div>
+        <div class="despesa-valor fixa">${brl(total)}</div>
+      </div>`;
+    }
+  });
+
+  if (doMes.length === 0 && html === ''){
     el.innerHTML = '<p class="empty-hint">Nenhuma despesa neste mês</p>';
   } else {
-    el.innerHTML = doMes.map(d => `
+    html += doMes.map(d => `
       <div class="despesa-item ${d.pago ? 'paga' : ''}">
         <div class="check ${d.pago ? 'on' : ''}" onclick="togglePago('${d.id}', ${d.pago}, '${d.contaId||''}', ${d.valor||0})">${d.pago ? '✓' : ''}</div>
         <div class="despesa-info">
@@ -1092,14 +1212,22 @@ function renderDespesas(){
           <div class="despesa-sub">${d.categoria} · ${d.contaNome || 'sem conta'} · vence ${formatarData(d.vencimento)}</div>
         </div>
         <div class="despesa-valor ${d.tipo === 'Fixa' ? 'fixa' : 'variavel'}">${brl(d.valor||0)}</div>
+        <button class="del-btn" onclick="abrirFormDespesa('${d.id}')">✏️</button>
         <button class="del-btn" onclick="excluirDespesa('${d.id}')">✕</button>
       </div>
     `).join('');
+    el.innerHTML = html;
   }
 
   renderEntradas();
   renderHome(); // home depende do estado global de despesas/contas também
 }
+
+window.abrirFaturaNoMes = function(cartaoId, chave){
+  const [ano,mes] = chave.split('-').map(Number);
+  mesFatura = new Date(ano, mes-1, 1);
+  setTimeout(()=> abrirFatura(cartaoId), 50);
+};
 
 function renderEntradas(){
   const elEntradas = document.getElementById('lista-entradas');
@@ -1542,6 +1670,42 @@ function mesFaturaDe(dataCompraISO, diaFechamento){
   return `${ano}-${String(mes+1).padStart(2,'0')}`;
 }
 
+// Valor de UMA parcela (já dividido, se for o caso) — usado em toda exibição/soma
+function valorParcelaDe(l){
+  if (typeof l.valorParcela === 'number') return l.valorParcela;
+  if (l.parcelaTotal > 1) return (l.valor||0) / l.parcelaTotal;
+  return l.valor || 0;
+}
+
+// Expande um cartão em itens (reais + projetados) que caem numa fatura específica (chaveFatura = 'YYYY-MM' do vencimento)
+function itensDaFaturaPara(cartaoId, chaveFatura){
+  const itens = [];
+  lancamentosCartao.filter(l => l.cartaoId === cartaoId).forEach(l => {
+    const cart = cartoes.find(c => c.id === cartaoId);
+    if (!cart) return;
+    const mesBase = mesFaturaDe(l.data, cart.diaFechamento); // mês em que a parcela registrada (parcelaAtual) cai
+    const [anoBase, mesBaseNum] = mesBase.split('-').map(Number);
+    const totalParcelas = l.parcelaTotal > 1 ? l.parcelaTotal : 1;
+    for (let p = (l.parcelaAtual||1); p <= totalParcelas; p++){
+      const offset = p - (l.parcelaAtual||1);
+      const d = new Date(anoBase, mesBaseNum-1+offset, 1);
+      const chave = mesChave(d);
+      if (chave === chaveFatura){
+        itens.push({
+          origemId: l.id, real: offset === 0, descricao: l.descricao, categoria: l.categoria,
+          data: l.data, valor: valorParcelaDe(l), parcelaAtual: p, parcelaTotal: totalParcelas, tipo: l.tipo
+        });
+      }
+    }
+  });
+  return itens;
+}
+
+// Soma total de uma fatura (mesma lógica usada em vários lugares)
+function totalFaturaDe(cartaoId, chaveFatura){
+  return itensDaFaturaPara(cartaoId, chaveFatura).reduce((s,it)=> s + it.valor, 0);
+}
+
 function renderCartoes(){
   const listaEl = document.getElementById('lista-cartoes');
   if (!listaEl) return;
@@ -1549,10 +1713,10 @@ function renderCartoes(){
   if (cartoes.length === 0){
     listaEl.innerHTML = '<p class="empty-hint">Nenhum cartão cadastrado ainda</p>';
   } else {
-    const chaveMesAtual = mesChave(new Date());
+    const hojeISO = new Date().toISOString().slice(0,10);
     listaEl.innerHTML = cartoes.map(cart => {
-      const lancsFatura = lancamentosCartao.filter(l => l.cartaoId === cart.id && mesFaturaDe(l.data, cart.diaFechamento) === chaveMesAtual);
-      const totalFatura = lancsFatura.reduce((s,l)=> s + (l.valor||0), 0);
+      const chaveAberta = mesFaturaDe(hojeISO, cart.diaFechamento); // fatura que ainda está "aberta" (acumulando)
+      const totalFatura = totalFaturaDe(cart.id, chaveAberta);
       const limiteDisp = (cart.limiteTotal||0) - totalFatura;
       const usoRatio = cart.limiteTotal > 0 ? Math.min(1, totalFatura/cart.limiteTotal) : 0;
       return `
@@ -1574,9 +1738,10 @@ function renderCartoes(){
     }).join('');
   }
 
+  const hojeISO = new Date().toISOString().slice(0,10);
   const limiteTotalGeral = cartoes.reduce((s,c)=> {
-    const chaveMesAtual = mesChave(new Date());
-    const totalFatura = lancamentosCartao.filter(l => l.cartaoId === c.id && mesFaturaDe(l.data, c.diaFechamento) === chaveMesAtual).reduce((s2,l)=> s2+(l.valor||0), 0);
+    const chaveAberta = mesFaturaDe(hojeISO, c.diaFechamento);
+    const totalFatura = totalFaturaDe(c.id, chaveAberta);
     return s + Math.max(0, (c.limiteTotal||0) - totalFatura);
   }, 0);
   document.getElementById('cartoes-limite-total').textContent = brl(limiteTotalGeral);
@@ -1613,14 +1778,13 @@ function renderFatura(){
   document.getElementById('fatura-mes-label').textContent = NOMES_MES[mesFatura.getMonth()] + '/' + mesFatura.getFullYear();
   document.getElementById('fatura-fechamento-info').textContent = `Fecha dia ${cart.diaFechamento} · Vence dia ${cart.diaVencimento}`;
 
-  const lancsFatura = lancamentosCartao.filter(l => l.cartaoId === cart.id && mesFaturaDe(l.data, cart.diaFechamento) === chaveFatura)
-    .sort((a,b)=> (b.data||'').localeCompare(a.data||''));
-  const totalFatura = lancsFatura.reduce((s,l)=> s + (l.valor||0), 0);
+  const itensFatura = itensDaFaturaPara(cart.id, chaveFatura).sort((a,b)=> (b.data||'').localeCompare(a.data||''));
+  const totalFatura = itensFatura.reduce((s,it)=> s + it.valor, 0);
   document.getElementById('fatura-total').textContent = brl(totalFatura);
 
   // categoria
   const porCategoria = {};
-  lancsFatura.forEach(l => { porCategoria[l.categoria] = (porCategoria[l.categoria]||0) + (l.valor||0); });
+  itensFatura.forEach(it => { porCategoria[it.categoria] = (porCategoria[it.categoria]||0) + it.valor; });
   const catsOrdenadas = Object.entries(porCategoria).sort((a,b)=> b[1]-a[1]);
   const barEl = document.getElementById('fatura-cat-bar');
   const legEl = document.getElementById('fatura-cat-legenda');
@@ -1641,20 +1805,15 @@ function renderFatura(){
     `).join('');
   }
 
-  // parcelas — projeta os próximos meses com base nas parcelas em aberto de TODOS os lançamentos do cartão
-  const parcelados = lancamentosCartao.filter(l => l.cartaoId === cart.id && l.parcelaTotal > 1);
+  // parcelas — soma, por mês de vencimento, os itens expandidos dos próximos 6 meses
   const porMesParcela = {};
-  parcelados.forEach(l => {
-    const mesBase = mesFaturaDe(l.data, cart.diaFechamento); // mês em que a parcela atual cai
-    const restantes = l.parcelaTotal - l.parcelaAtual; // quantas parcelas futuras depois dessa
-    for (let i = 0; i <= restantes; i++){
-      const [ano,mes] = mesBase.split('-').map(Number);
-      const dt = new Date(ano, mes-1+i, 1);
-      const chave = mesChave(dt);
-      porMesParcela[chave] = (porMesParcela[chave]||0) + (l.valor||0);
-    }
-  });
-  const mesesParcela = Object.entries(porMesParcela).sort((a,b)=> a[0].localeCompare(b[0])).slice(0,6);
+  for (let i=0; i<6; i++){
+    const d = new Date(mesFatura.getFullYear(), mesFatura.getMonth()+i, 1);
+    const chave = mesChave(d);
+    const soma = itensDaFaturaPara(cart.id, chave).reduce((s,it)=> s + it.valor, 0);
+    if (soma > 0) porMesParcela[chave] = soma;
+  }
+  const mesesParcela = Object.entries(porMesParcela).sort((a,b)=> a[0].localeCompare(b[0]));
   const parcelasEl = document.getElementById('fatura-parcelas');
   if (mesesParcela.length === 0){
     parcelasEl.innerHTML = '<p class="empty-hint">Nenhuma parcela em aberto</p>';
@@ -1664,7 +1823,7 @@ function renderFatura(){
       mesesParcela.map(([chave,val]) => {
         const [ano,mes] = chave.split('-').map(Number);
         const altura = 8 + (val/maxV)*54;
-        const atual = chave === mesChave(new Date());
+        const atual = chave === chaveFatura;
         return `
         <div style="flex:1; text-align:center">
           <div class="mono" style="font-size:9px; color:var(--ink-soft); margin-bottom:4px">${brl(val).replace('R$ ','')}</div>
@@ -1674,19 +1833,19 @@ function renderFatura(){
       }).join('') + `</div>`;
   }
 
-  // lançamentos
+  // lançamentos (itens reais mostram botão de excluir; parcelas futuras projetadas são só visualização)
   const listaEl = document.getElementById('lista-lancamentos');
-  if (lancsFatura.length === 0){
+  if (itensFatura.length === 0){
     listaEl.innerHTML = '<p class="empty-hint">Nenhum lançamento nesta fatura</p>';
   } else {
-    listaEl.innerHTML = lancsFatura.map(l => `
+    listaEl.innerHTML = itensFatura.map(it => `
       <div class="despesa-item" style="flex-wrap:wrap">
         <div class="despesa-info">
-          <div class="despesa-nome">${l.descricao}</div>
-          <div class="despesa-sub">${formatarData(l.data)} · ${l.categoria}${l.parcelaTotal>1 ? ' · '+l.parcelaAtual+'/'+l.parcelaTotal : ''}</div>
+          <div class="despesa-nome">${it.descricao}</div>
+          <div class="despesa-sub">${formatarData(it.data)} · ${it.categoria}${it.parcelaTotal>1 ? ' · '+it.parcelaAtual+'/'+it.parcelaTotal : ''}${it.tipo==='Fixa' ? ' · Fixa/Assinatura' : ''}${!it.real ? ' · projeção' : ''}</div>
         </div>
-        <div class="despesa-valor" style="color:var(--terracota)">${brl(l.valor||0)}</div>
-        <button class="del-btn" onclick="excluirLancamento('${l.id}')">✕</button>
+        <div class="despesa-valor" style="color:var(--terracota)">${brl(it.valor)}</div>
+        ${it.real ? `<button class="del-btn" onclick="excluirLancamento('${it.origemId}')">✕</button>` : `<span class="muted" style="font-size:11px">futuro</span>`}
       </div>
     `).join('');
   }
@@ -1698,12 +1857,14 @@ window.salvarLancamento = async function(e){
   const valor = parseFloat(document.getElementById('lanc-valor').value || 0);
   const data = document.getElementById('lanc-data').value;
   const categoria = document.getElementById('lanc-categoria').value;
+  const tipo = document.getElementById('lanc-tipo').value;
   const parcelado = document.getElementById('lanc-parcelado').value === 'sim';
   const parcelaAtual = parcelado ? parseInt(document.getElementById('lanc-parcela-atual').value || 1) : 1;
   const parcelaTotal = parcelado ? parseInt(document.getElementById('lanc-parcela-total').value || 1) : 1;
+  const valorParcela = parcelaTotal > 1 ? valor/parcelaTotal : valor; // "Valor" informado é o TOTAL da compra
   try{
     await addDoc(collection(db, 'lancamentosCartao'), {
-      cartaoId: cartaoAbertoId, descricao, valor, data, categoria, parcelaAtual, parcelaTotal, criadoEm: serverTimestamp()
+      cartaoId: cartaoAbertoId, descricao, valor, valorParcela, data, categoria, tipo, parcelaAtual, parcelaTotal, criadoEm: serverTimestamp()
     });
     toast('Lançamento salvo!');
     document.getElementById('form-lancamento').reset();
@@ -1786,8 +1947,8 @@ window.importarExtrato = async function(event){
       }
 
       await addDoc(collection(db, 'lancamentosCartao'), {
-        cartaoId: cartaoAbertoId, descricao: descricaoLimpa, valor, data: dataISO,
-        categoria: 'Outros', parcelaAtual, parcelaTotal, criadoEm: serverTimestamp()
+        cartaoId: cartaoAbertoId, descricao: descricaoLimpa, valor, valorParcela: valor, data: dataISO,
+        categoria: 'Outros', tipo: 'Variável', parcelaAtual, parcelaTotal, criadoEm: serverTimestamp()
       });
       importados++;
     }
@@ -1933,12 +2094,14 @@ onSnapshot(query(collection(db, 'contas'), orderBy('criadoEm','asc')), snap => {
 onSnapshot(query(collection(db, 'despesas'), orderBy('vencimento','asc')), snap => {
   despesas = snap.docs.map(d => ({ id:d.id, ...d.data() }));
   renderDespesas();
+  manterRecorrenciasEmDia(despesas, 'despesas', 'vencimento');
 });
 
 onSnapshot(query(collection(db, 'entradas'), orderBy('data','asc')), snap => {
   entradas = snap.docs.map(d => ({ id:d.id, ...d.data() }));
   renderEntradas();
   renderHome();
+  manterRecorrenciasEmDia(entradas, 'entradas', 'data');
 });
 
 onSnapshot(query(collection(db, 'investimentos'), orderBy('criadoEm','asc')), snap => {
@@ -1950,12 +2113,14 @@ onSnapshot(query(collection(db, 'cartoes'), orderBy('criadoEm','asc')), snap => 
   cartoes = snap.docs.map(d => ({ id:d.id, ...d.data() }));
   renderCartoes();
   if (cartaoAbertoId) renderFatura();
+  renderDespesas();
 });
 
 onSnapshot(query(collection(db, 'lancamentosCartao'), orderBy('data','desc')), snap => {
   lancamentosCartao = snap.docs.map(d => ({ id:d.id, ...d.data() }));
   renderCartoes();
   if (cartaoAbertoId) renderFatura();
+  renderDespesas();
 });
 
 renderDespesas();
