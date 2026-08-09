@@ -1079,8 +1079,13 @@ window.salvarDespesa = async function(e){
     } else {
       if (tipo === 'Fixa'){
         const recorrenciaId = 'r' + Date.now() + Math.random().toString(36).slice(2,8);
-        await addDoc(collection(db, 'despesas'), { ...dados, pago:false, recorrenciaId, criadoEm: serverTimestamp() });
-        await gerarRecorrencia('despesas', { ...dados, pago:false, recorrenciaId }, 'vencimento', MESES_RECORRENCIA);
+        recorrenciasEmExtensao.add(recorrenciaId); // trava a auto-extensão até terminarmos de criar a série inicial
+        try{
+          await addDoc(collection(db, 'despesas'), { ...dados, pago:false, recorrenciaId, criadoEm: serverTimestamp() });
+          await gerarRecorrencia('despesas', { ...dados, pago:false, recorrenciaId }, 'vencimento', MESES_RECORRENCIA);
+        } finally {
+          recorrenciasEmExtensao.delete(recorrenciaId);
+        }
         toast('Despesa salva — vai se repetir todo mês automaticamente, sem limite.');
       } else {
         await addDoc(collection(db, 'despesas'), { ...dados, pago:false, criadoEm: serverTimestamp() });
@@ -1132,8 +1137,13 @@ window.salvarEntrada = async function(e){
   try{
     if (tipo === 'Fixa'){
       const recorrenciaId = 'r' + Date.now() + Math.random().toString(36).slice(2,8);
-      await addDoc(collection(db, 'entradas'), { ...dadosBase, recebido:false, recorrenciaId, criadoEm: serverTimestamp() });
-      await gerarRecorrencia('entradas', { ...dadosBase, recebido:false, recorrenciaId }, 'data', MESES_RECORRENCIA);
+      recorrenciasEmExtensao.add(recorrenciaId);
+      try{
+        await addDoc(collection(db, 'entradas'), { ...dadosBase, recebido:false, recorrenciaId, criadoEm: serverTimestamp() });
+        await gerarRecorrencia('entradas', { ...dadosBase, recebido:false, recorrenciaId }, 'data', MESES_RECORRENCIA);
+      } finally {
+        recorrenciasEmExtensao.delete(recorrenciaId);
+      }
       toast('Receita salva — vai se repetir todo mês automaticamente, sem limite.');
     } else {
       await addDoc(collection(db, 'entradas'), { ...dadosBase, recebido:false, criadoEm: serverTimestamp() });
