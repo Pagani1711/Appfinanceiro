@@ -270,13 +270,17 @@
       </div>
     </div>
 
-    <div class="section-title">Receitas</div>
+    <div class="section-title row-between" style="align-items:center">
+      <span>Receitas</span>
+      <button class="btn-outline small" style="width:auto; padding:6px 14px; border-radius:99px" onclick="abrirFormEntrada()">+ Nova</button>
+    </div>
     <div id="lista-entradas"><p class="empty-hint">Nenhuma receita neste mês</p></div>
-    <button class="btn btn-outline" onclick="abrirFormEntrada()">+ &nbsp;Nova receita</button>
 
-    <div class="section-title" style="margin-top:22px">Despesas</div>
+    <div class="section-title row-between" style="align-items:center; margin-top:22px">
+      <span>Despesas</span>
+      <button class="btn-outline small" style="width:auto; padding:6px 14px; border-radius:99px" onclick="abrirFormDespesa()">+ Nova</button>
+    </div>
     <div id="lista-despesas"><p class="empty-hint">Nenhuma despesa neste mês</p></div>
-    <button class="btn btn-primary" onclick="abrirFormDespesa()">+ &nbsp;Nova despesa</button>
   </main>
 </section>
 
@@ -2336,12 +2340,11 @@ function renderDistribuicaoMes(chaveMes, totalReceitas){
     somaGrupo[grupo] += (d.valor||0);
   });
 
-  // gastos de cartão do mês, também por grupo (usa a mesma lógica de alocação da fatura)
-  cartoes.forEach(cart => {
-    itensDaFaturaPara(cart.id, chaveMes).forEach(it => {
-      const grupo = it.grupo || CATEGORIA_GRUPO[it.categoria] || 'Essencial';
-      somaGrupo[grupo] += it.valor;
-    });
+  // gastos de cartão do mês, por grupo — aqui conta pela DATA DA COMPRA (não pela fatura),
+  // pra refletir o hábito de gasto do dia a dia, mesmo que a fatura só feche depois
+  lancamentosCartao.filter(l => (l.data||'').startsWith(chaveMes)).forEach(l => {
+    const grupo = l.grupo || CATEGORIA_GRUPO[l.categoria] || 'Essencial';
+    somaGrupo[grupo] += valorParcelaDe(l);
   });
 
   // investimentos novos criados no mês entram como "Investimento"
@@ -2362,18 +2365,20 @@ function renderDistribuicaoMes(chaveMes, totalReceitas){
   }
 
   el.innerHTML = Object.entries(somaGrupo).map(([grupo,val]) => {
-    const pct = (val/totalReceitas)*100;
     const meta = METAS_DISTRIBUICAO[grupo];
-    const foraDaMeta = pct > meta + 5;
+    const orcamento = totalReceitas * (meta/100);
+    const pctUsado = orcamento > 0 ? (val/orcamento)*100 : 0;
+    const foraDaMeta = pctUsado > 100;
     const cor = foraDaMeta ? 'var(--terracota)' : 'var(--green)';
     return `
     <div class="card" style="margin-bottom:10px">
       <div class="row-between">
         <span style="font-weight:500; font-size:13.5px">${grupo}</span>
-        <span class="mono" style="color:${cor}; font-size:13.5px">${pct.toFixed(0)}% <span class="muted" style="font-size:11px">/ meta ${meta}%</span></span>
+        <span class="mono" style="color:${cor}; font-size:13.5px">${pctUsado.toFixed(0)}% da meta</span>
       </div>
-      <div class="barra" style="margin-top:8px"><div class="barra-fill" style="width:${Math.min(100,pct)}%; background:${cor}"></div></div>
-      ${foraDaMeta ? `<div class="muted" style="margin-top:6px; color:var(--terracota)">Acima da meta em ${(pct-meta).toFixed(0)}%</div>` : ''}
+      <div class="barra" style="margin-top:8px"><div class="barra-fill" style="width:${Math.min(100,pctUsado)}%; background:${cor}"></div></div>
+      <div class="muted" style="margin-top:6px">${brl(val)} de ${brl(orcamento)} (orçamento de ${meta}% da receita)</div>
+      ${foraDaMeta ? `<div class="muted" style="margin-top:4px; color:var(--terracota)">Passou do orçamento em ${brl(val-orcamento)}</div>` : ''}
     </div>`;
   }).join('');
 }
