@@ -526,7 +526,7 @@
   <div class="sheet">
     <div class="sheet-header">
       <button onclick="fecharForm('overlay-conta')">←</button>
-      <h2>Nova conta corrente</h2>
+      <h2 id="conta-sheet-title">Nova conta corrente</h2>
     </div>
     <form id="form-conta" onsubmit="salvarConta(event)">
       <div class="campo">
@@ -536,6 +536,7 @@
       <div class="campo">
         <label>Saldo atual</label>
         <input type="number" step="0.01" inputmode="decimal" id="conta-saldo" placeholder="0,00" required>
+        <div class="hint muted" style="margin-top:6px">Ajuste aqui se precisar corrigir/reconciliar com o saldo real do banco.</div>
       </div>
       <div class="campo">
         <label>Tem limite de cheque especial?</label>
@@ -549,7 +550,7 @@
         <label>Valor do limite</label>
         <input type="number" step="0.01" inputmode="decimal" id="conta-limite" placeholder="0,00">
       </div>
-      <button class="btn btn-primary" type="submit">Salvar conta</button>
+      <button class="btn btn-primary" type="submit" id="conta-submit-btn">Salvar conta</button>
     </form>
   </div>
 </div>
@@ -625,7 +626,7 @@
   <div class="sheet">
     <div class="sheet-header">
       <button onclick="fecharForm('overlay-entrada')">←</button>
-      <h2>Nova receita</h2>
+      <h2 id="entrada-sheet-title">Nova receita</h2>
     </div>
     <form id="form-entrada" onsubmit="salvarEntrada(event)">
       <div class="campo">
@@ -662,7 +663,7 @@
         <input type="date" id="entrada-data" required>
       </div>
       <div class="hint muted" style="margin:-8px 2px 16px">O valor só entra no saldo da conta depois que você marcar como recebida na lista.</div>
-      <button class="btn btn-primary" type="submit">Salvar receita</button>
+      <button class="btn btn-primary" type="submit" id="entrada-submit-btn">Salvar receita</button>
     </form>
   </div>
 </div>
@@ -849,7 +850,31 @@ window.toggleSeg = function(btn){
   if (hidden && hidden.tagName === 'INPUT') hidden.value = btn.dataset.val;
 };
 
-window.abrirFormConta = function(){ document.getElementById('overlay-conta').classList.add('open'); };
+let contaEditandoId = null;
+
+window.abrirFormConta = function(id){
+  document.getElementById('form-conta').reset();
+  contaEditandoId = id || null;
+
+  if (id){
+    const c = contas.find(x => x.id === id);
+    if (!c) return;
+    document.getElementById('conta-sheet-title').textContent = 'Editar conta';
+    document.getElementById('conta-submit-btn').textContent = 'Salvar alterações';
+    document.getElementById('conta-nome').value = c.nome || '';
+    document.getElementById('conta-saldo').value = c.saldo ?? '';
+    document.getElementById('conta-limite').value = c.limite || '';
+    const limiteBtn = document.querySelector('#form-conta .seg [data-val="'+(c.temLimite ? 'sim' : 'nao')+'"]');
+    if (limiteBtn) toggleSeg(limiteBtn);
+  } else {
+    document.getElementById('conta-sheet-title').textContent = 'Nova conta corrente';
+    document.getElementById('conta-submit-btn').textContent = 'Salvar conta';
+    const limiteBtn = document.querySelector('#form-conta .seg [data-val="sim"]');
+    if (limiteBtn) toggleSeg(limiteBtn);
+  }
+
+  document.getElementById('overlay-conta').classList.add('open');
+};
 let despesaEditandoId = null;
 
 window.abrirFormDespesa = function(id){
@@ -882,9 +907,36 @@ window.abrirFormDespesa = function(id){
 
   document.getElementById('overlay-despesa').classList.add('open');
 };
-window.abrirFormEntrada = function(){
+let entradaEditandoId = null;
+
+window.abrirFormEntrada = function(id){
   const sel = document.getElementById('entrada-conta');
   sel.innerHTML = contas.map(c => `<option value="${c.id}">${c.nome}</option>`).join('') || '<option value="">Nenhuma conta cadastrada</option>';
+  document.getElementById('form-entrada').reset();
+  entradaEditandoId = id || null;
+
+  if (id){
+    const en = entradas.find(x => x.id === id);
+    if (!en) return;
+    document.getElementById('entrada-sheet-title').textContent = 'Editar receita';
+    document.getElementById('entrada-submit-btn').textContent = 'Salvar alterações';
+    document.getElementById('entrada-nome').value = en.nome || '';
+    document.getElementById('entrada-valor').value = en.valor || '';
+    document.getElementById('entrada-categoria').value = en.categoria || 'Outros';
+    if (en.contaId) sel.value = en.contaId;
+    document.getElementById('entrada-data').value = en.data || '';
+    const tipoBtn = document.querySelector('#form-entrada .seg [data-val="'+en.tipo+'"]');
+    if (tipoBtn) toggleSeg(tipoBtn);
+    if (en.recorrenciaId){
+      toast('Isso é uma série fixa — a alteração vale só pra este mês.');
+    }
+  } else {
+    document.getElementById('entrada-sheet-title').textContent = 'Nova receita';
+    document.getElementById('entrada-submit-btn').textContent = 'Salvar receita';
+    const tipoBtn = document.querySelector('#form-entrada .seg [data-val="Fixa"]');
+    if (tipoBtn) toggleSeg(tipoBtn);
+  }
+
   document.getElementById('overlay-entrada').classList.add('open');
 };
 window.fecharForm = function(id){ document.getElementById(id).classList.remove('open'); };
@@ -1036,10 +1088,16 @@ window.salvarConta = async function(e){
   const temLimite = document.getElementById('conta-tem-limite').value === 'sim';
   const limite = temLimite ? parseFloat(document.getElementById('conta-limite').value || 0) : 0;
   try{
-    await addDoc(collection(db, 'contas'), { nome, saldo, temLimite, limite, criadoEm: serverTimestamp() });
-    toast('Conta salva!');
+    if (contaEditandoId){
+      await updateDoc(doc(db, 'contas', contaEditandoId), { nome, saldo, temLimite, limite });
+      toast('Conta atualizada!');
+    } else {
+      await addDoc(collection(db, 'contas'), { nome, saldo, temLimite, limite, criadoEm: serverTimestamp() });
+      toast('Conta salva!');
+    }
     document.getElementById('form-conta').reset();
     fecharForm('overlay-conta');
+    contaEditandoId = null;
   }catch(err){
     console.error(err);
     toast('Erro ao salvar. Veja o console.');
@@ -1065,6 +1123,7 @@ function renderContas(){
             <div style="font-weight:600;font-size:15px">${c.nome}</div>
             <div class="muted">Conta corrente</div>
           </div>
+          <button class="del-btn" onclick="abrirFormConta('${c.id}')">✏️</button>
           <button class="del-btn" onclick="excluirConta('${c.id}')">✕</button>
         </div>
         <div class="value" style="margin-top:10px; ${saldo<0?'color:var(--terracota)':''}">${brl(saldo)}</div>
@@ -1236,7 +1295,10 @@ window.salvarEntrada = async function(e){
   const data = document.getElementById('entrada-data').value;
   const dadosBase = { nome, valor, categoria, tipo, contaId, contaNome: contaObj ? contaObj.nome : '', data };
   try{
-    if (tipo === 'Fixa'){
+    if (entradaEditandoId){
+      await updateDoc(doc(db, 'entradas', entradaEditandoId), dadosBase);
+      toast('Receita atualizada!');
+    } else if (tipo === 'Fixa'){
       const recorrenciaId = 'r' + Date.now() + Math.random().toString(36).slice(2,8);
       recorrenciasEmExtensao.add(recorrenciaId);
       try{
@@ -1252,6 +1314,7 @@ window.salvarEntrada = async function(e){
     }
     document.getElementById('form-entrada').reset();
     fecharForm('overlay-entrada');
+    entradaEditandoId = null;
   }catch(err){
     console.error(err);
     toast('Erro ao salvar. Veja o console.');
@@ -1418,6 +1481,7 @@ function renderEntradas(){
           <div class="despesa-sub">${en.categoria}${en.tipo ? ' · '+en.tipo : ''} · ${en.contaNome || 'sem conta'} · ${formatarData(en.data)}</div>
         </div>
         <div class="despesa-valor" style="color:var(--green)">+${brl(en.valor||0)}</div>
+        <button class="del-btn" onclick="abrirFormEntrada('${en.id}')">✏️</button>
         <button class="del-btn" onclick="excluirEntrada('${en.id}')">✕</button>
       </div>
     `).join('');
@@ -1916,20 +1980,39 @@ function valorParcelaDe(l){
 // Expande um cartão em itens (reais + projetados) que caem numa fatura específica (chaveFatura = 'YYYY-MM' do vencimento)
 function itensDaFaturaPara(cartaoId, chaveFatura){
   const itens = [];
+  const cart = cartoes.find(c => c.id === cartaoId);
+  if (!cart) return itens;
   lancamentosCartao.filter(l => l.cartaoId === cartaoId).forEach(l => {
-    const cart = cartoes.find(c => c.id === cartaoId);
-    if (!cart) return;
     const mesBase = mesFaturaDe(l.data, cart); // mês em que a parcela registrada (parcelaAtual) cai
-    const [anoBase, mesBaseNum] = mesBase.split('-').map(Number);
     const totalParcelas = l.parcelaTotal > 1 ? l.parcelaTotal : 1;
-    for (let p = (l.parcelaAtual||1); p <= totalParcelas; p++){
-      const offset = p - (l.parcelaAtual||1);
-      const d = new Date(anoBase, mesBaseNum-1+offset, 1);
-      const chave = mesChave(d);
-      if (chave === chaveFatura){
+
+    if (totalParcelas > 1){
+      // parcelamento com número fixo de vezes
+      const [anoBase, mesBaseNum] = mesBase.split('-').map(Number);
+      for (let p = (l.parcelaAtual||1); p <= totalParcelas; p++){
+        const offset = p - (l.parcelaAtual||1);
+        const d = new Date(anoBase, mesBaseNum-1+offset, 1);
+        const chave = mesChave(d);
+        if (chave === chaveFatura){
+          itens.push({
+            origemId: l.id, real: offset === 0, descricao: l.descricao, categoria: l.categoria,
+            data: l.data, valor: valorParcelaDe(l), parcelaAtual: p, parcelaTotal: totalParcelas, tipo: l.tipo, grupo: l.grupo
+          });
+        }
+      }
+    } else if (l.tipo === 'Fixa'){
+      // assinatura/fixa — repete todo mês pra sempre, a partir do mês de origem
+      if (chaveFatura >= mesBase){
         itens.push({
-          origemId: l.id, real: offset === 0, descricao: l.descricao, categoria: l.categoria,
-          data: l.data, valor: valorParcelaDe(l), parcelaAtual: p, parcelaTotal: totalParcelas, tipo: l.tipo, grupo: l.grupo
+          origemId: l.id, real: chaveFatura === mesBase, descricao: l.descricao, categoria: l.categoria,
+          data: l.data, valor: valorParcelaDe(l), parcelaAtual: 1, parcelaTotal: 1, tipo: l.tipo, grupo: l.grupo
+        });
+      }
+    } else {
+      if (mesBase === chaveFatura){
+        itens.push({
+          origemId: l.id, real: true, descricao: l.descricao, categoria: l.categoria,
+          data: l.data, valor: valorParcelaDe(l), parcelaAtual: 1, parcelaTotal: 1, tipo: l.tipo, grupo: l.grupo
         });
       }
     }
