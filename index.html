@@ -353,9 +353,13 @@
       <p class="big-value" id="fatura-total">R$ 0,00</p>
     </header>
     <main>
-      <div class="btn-row" style="margin-bottom:6px">
+      <div class="btn-row" style="margin-bottom:10px">
         <button class="btn-outline small" style="padding:13px" onclick="document.getElementById('input-extrato').click()">⇪ Importar extrato</button>
         <button class="btn-outline small" style="padding:13px" onclick="abrirFormLancamento()">＋ Lançamento manual</button>
+      </div>
+      <div class="btn-row" style="margin-bottom:6px">
+        <button class="btn-outline small" style="padding:13px" onclick="fecharFaturaAtual()">🔒 Fechar fatura</button>
+        <button class="btn btn-primary" style="padding:13px; font-size:13px" onclick="marcarFaturaComoPaga()">✓ Marcar como paga</button>
       </div>
       <input type="file" id="input-extrato" accept=".csv,.xlsx,.xls" style="display:none" onchange="importarExtrato(event)">
 
@@ -379,7 +383,7 @@
   <div class="sheet">
     <div class="sheet-header">
       <button onclick="fecharForm('overlay-cartao')">←</button>
-      <h2>Novo cartão</h2>
+      <h2 id="cartao-sheet-title">Novo cartão</h2>
     </div>
     <form id="form-cartao" onsubmit="salvarCartao(event)">
       <div class="campo">
@@ -388,22 +392,27 @@
       </div>
       <div class="campo">
         <label>Final (últimos 4 dígitos)</label>
-        <input type="text" id="cartao-final" placeholder="Ex: 5404" maxlength="4">
+        <input type="text" inputmode="numeric" id="cartao-final" placeholder="Ex: 5404" maxlength="4">
       </div>
       <div class="campo">
         <label>Limite total</label>
-        <input type="number" step="0.01" id="cartao-limite" placeholder="0,00" required>
+        <input type="number" inputmode="decimal" step="0.01" id="cartao-limite" placeholder="0,00" required>
       </div>
-      <div class="campo">
-        <label>Dia de fechamento da fatura</label>
-        <input type="number" min="1" max="31" id="cartao-fechamento" placeholder="Ex: 25" required>
-        <div class="hint muted" style="margin-top:6px">Pode variar mês a mês — edite aqui sempre que mudar.</div>
+      <div class="campo" id="cartao-fechamento-campo">
+        <label>Dia de fechamento da fatura (atual)</label>
+        <input type="number" inputmode="numeric" min="1" max="31" id="cartao-fechamento" placeholder="Ex: 25" required>
+        <div class="hint muted" style="margin-top:6px">Depois de cadastrado, use o botão "Fechar fatura" dentro do cartão pra atualizar isso mês a mês.</div>
       </div>
       <div class="campo">
         <label>Dia de vencimento</label>
-        <input type="number" min="1" max="31" id="cartao-vencimento" placeholder="Ex: 5" required>
+        <input type="number" inputmode="numeric" min="1" max="31" id="cartao-vencimento" placeholder="Ex: 5" required>
       </div>
-      <button class="btn btn-primary" type="submit">Salvar cartão</button>
+      <div class="campo">
+        <label>Conta de pagamento</label>
+        <select id="cartao-conta-pagamento"></select>
+        <div class="hint muted" style="margin-top:6px">De onde sai o dinheiro quando você marcar a fatura como paga.</div>
+      </div>
+      <button class="btn btn-primary" type="submit" id="cartao-submit-btn">Salvar cartão</button>
     </form>
   </div>
 </div>
@@ -422,7 +431,7 @@
       </div>
       <div class="campo">
         <label id="lanc-valor-label">Valor</label>
-        <input type="number" step="0.01" id="lanc-valor" placeholder="0,00" required>
+        <input type="number" step="0.01" inputmode="decimal" id="lanc-valor" placeholder="0,00" required>
         <div class="hint muted" id="lanc-valor-hint" style="margin-top:6px; display:none">Informe o valor TOTAL da compra — o app divide pelas parcelas automaticamente.</div>
       </div>
       <div class="campo">
@@ -458,6 +467,16 @@
         <input type="hidden" id="lanc-tipo" value="Variável">
       </div>
       <div class="campo">
+        <label>Grupo</label>
+        <div class="seg">
+          <button type="button" class="active" data-val="Essencial" onclick="toggleSeg(this)">Essencial</button>
+          <button type="button" data-val="Lazer" onclick="toggleSeg(this)">Lazer</button>
+          <button type="button" data-val="Investimento" onclick="toggleSeg(this)">Investimento</button>
+        </div>
+        <input type="hidden" id="lanc-grupo" value="Essencial">
+      </div>
+      <div class="hint muted" style="margin-top:-8px; margin-bottom:16px">A maior parte dos seus gastos de lazer costuma vir do cartão — marcar aqui é o que faz o Dashboard da Home bater com a realidade.</div>
+      <div class="campo">
         <label>É parcelado?</label>
         <div class="seg">
           <button type="button" class="active" data-val="nao" onclick="toggleParcelado(this)">Não</button>
@@ -467,11 +486,11 @@
       </div>
       <div class="campo" id="lanc-parcela-atual-campo" style="display:none">
         <label>Parcela atual</label>
-        <input type="number" min="1" id="lanc-parcela-atual" placeholder="Ex: 1">
+        <input type="number" min="1" inputmode="numeric" id="lanc-parcela-atual" placeholder="Ex: 1">
       </div>
       <div class="campo" id="lanc-parcela-total-campo" style="display:none">
         <label>Total de parcelas</label>
-        <input type="number" min="1" id="lanc-parcela-total" placeholder="Ex: 5">
+        <input type="number" min="1" inputmode="numeric" id="lanc-parcela-total" placeholder="Ex: 5">
       </div>
       <button class="btn btn-primary" type="submit">Salvar lançamento</button>
     </form>
@@ -512,7 +531,7 @@
       </div>
       <div class="campo">
         <label>Saldo atual</label>
-        <input type="number" step="0.01" id="conta-saldo" placeholder="0,00" required>
+        <input type="number" step="0.01" inputmode="decimal" id="conta-saldo" placeholder="0,00" required>
       </div>
       <div class="campo">
         <label>Tem limite de cheque especial?</label>
@@ -524,7 +543,7 @@
       </div>
       <div class="campo">
         <label>Valor do limite</label>
-        <input type="number" step="0.01" id="conta-limite" placeholder="0,00">
+        <input type="number" step="0.01" inputmode="decimal" id="conta-limite" placeholder="0,00">
       </div>
       <button class="btn btn-primary" type="submit">Salvar conta</button>
     </form>
@@ -545,7 +564,7 @@
       </div>
       <div class="campo">
         <label>Valor</label>
-        <input type="number" step="0.01" id="despesa-valor" placeholder="0,00" required>
+        <input type="number" step="0.01" inputmode="decimal" id="despesa-valor" placeholder="0,00" required>
       </div>
       <div class="campo">
         <label>Categoria</label>
@@ -583,6 +602,15 @@
         <label>Data de vencimento</label>
         <input type="date" id="despesa-vencimento" required>
       </div>
+      <div class="campo">
+        <label>Grupo</label>
+        <div class="seg">
+          <button type="button" class="active" data-val="Essencial" onclick="toggleSeg(this)">Essencial</button>
+          <button type="button" data-val="Lazer" onclick="toggleSeg(this)">Lazer</button>
+          <button type="button" data-val="Investimento" onclick="toggleSeg(this)">Investimento</button>
+        </div>
+        <input type="hidden" id="despesa-grupo" value="Essencial">
+      </div>
       <button class="btn btn-primary" type="submit" id="despesa-submit-btn">Salvar despesa</button>
     </form>
   </div>
@@ -602,7 +630,7 @@
       </div>
       <div class="campo">
         <label>Valor</label>
-        <input type="number" step="0.01" id="entrada-valor" placeholder="0,00" required>
+        <input type="number" step="0.01" inputmode="decimal" id="entrada-valor" placeholder="0,00" required>
       </div>
       <div class="campo">
         <label>Categoria</label>
@@ -692,11 +720,11 @@
         </div>
         <div class="campo">
           <label>Quantidade de cotas/ações</label>
-          <input type="number" step="1" id="inv-quantidade" placeholder="Ex: 120">
+          <input type="number" step="1" inputmode="numeric" id="inv-quantidade" placeholder="Ex: 120">
         </div>
         <div class="campo">
           <label>Preço médio de compra (por cota)</label>
-          <input type="number" step="0.01" id="inv-preco-medio" placeholder="0,00">
+          <input type="number" step="0.01" inputmode="decimal" id="inv-preco-medio" placeholder="0,00">
         </div>
         <div class="campo">
           <label>Conta que recebe os rendimentos</label>
@@ -728,11 +756,11 @@
         </div>
         <div class="campo">
           <label>Quantidade</label>
-          <input type="number" step="0.00000001" id="inv-cripto-quantidade" placeholder="Ex: 0,015">
+          <input type="number" step="0.00000001" inputmode="decimal" id="inv-cripto-quantidade" placeholder="Ex: 0,015">
         </div>
         <div class="campo">
           <label>Preço médio de compra (R$ por unidade)</label>
-          <input type="number" step="0.01" id="inv-cripto-preco-medio" placeholder="0,00">
+          <input type="number" step="0.01" inputmode="decimal" id="inv-cripto-preco-medio" placeholder="0,00">
         </div>
         <div class="hint muted" style="margin:-8px 2px 16px">Moedas da lista atualizam sozinhas. "Outra" fica no preço médio até você editar manualmente.</div>
       </div>
@@ -740,11 +768,11 @@
       <div id="inv-bloco-prefixado">
         <div class="campo">
           <label>Valor investido</label>
-          <input type="number" step="0.01" id="inv-valor-investido" placeholder="0,00">
+          <input type="number" step="0.01" inputmode="decimal" id="inv-valor-investido" placeholder="0,00">
         </div>
         <div class="campo">
           <label>Taxa de juros ao ano (%)</label>
-          <input type="number" step="0.01" id="inv-taxa" placeholder="Ex: 15">
+          <input type="number" step="0.01" inputmode="decimal" id="inv-taxa" placeholder="Ex: 15">
         </div>
         <div class="campo">
           <label>Data de início</label>
@@ -760,7 +788,7 @@
       <div id="inv-bloco-manual" style="display:none">
         <div class="campo">
           <label>Valor atual</label>
-          <input type="number" step="0.01" id="inv-valor-manual" placeholder="0,00">
+          <input type="number" step="0.01" inputmode="decimal" id="inv-valor-manual" placeholder="0,00">
         </div>
         <div class="hint muted" style="margin:-8px 2px 16px">Esse tipo ainda não atualiza sozinho — edite quando o valor mudar.</div>
       </div>
@@ -837,11 +865,15 @@ window.abrirFormDespesa = function(id){
     document.getElementById('despesa-vencimento').value = d.vencimento || '';
     const tipoBtn = document.querySelector('#form-despesa .seg [data-val="'+d.tipo+'"]');
     if (tipoBtn) toggleSeg(tipoBtn);
+    const grupoBtn = document.querySelector('#form-despesa .seg [data-val="'+(d.grupo||'Essencial')+'"]');
+    if (grupoBtn) toggleSeg(grupoBtn);
   } else {
     document.getElementById('despesa-sheet-title').textContent = 'Nova despesa';
     document.getElementById('despesa-submit-btn').textContent = 'Salvar despesa';
     const tipoBtn = document.querySelector('#form-despesa .seg [data-val="Fixa"]');
     if (tipoBtn) toggleSeg(tipoBtn);
+    const grupoBtn = document.querySelector('#form-despesa .seg [data-val="Essencial"]');
+    if (grupoBtn) toggleSeg(grupoBtn);
   }
 
   document.getElementById('overlay-despesa').classList.add('open');
@@ -853,7 +885,36 @@ window.abrirFormEntrada = function(){
 };
 window.fecharForm = function(id){ document.getElementById(id).classList.remove('open'); };
 
-window.abrirFormCartao = function(){ document.getElementById('overlay-cartao').classList.add('open'); };
+let cartaoEditandoId = null;
+
+window.abrirFormCartao = function(id){
+  const sel = document.getElementById('cartao-conta-pagamento');
+  sel.innerHTML = '<option value="">Nenhuma (definir depois)</option>' + contas.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
+  document.getElementById('form-cartao').reset();
+  cartaoEditandoId = id || null;
+
+  if (id){
+    const cart = cartoes.find(c => c.id === id);
+    if (!cart) return;
+    document.getElementById('cartao-sheet-title').textContent = 'Editar cartão';
+    document.getElementById('cartao-submit-btn').textContent = 'Salvar alterações';
+    document.getElementById('cartao-nome').value = cart.nome || '';
+    document.getElementById('cartao-final').value = cart.final || '';
+    document.getElementById('cartao-limite').value = cart.limiteTotal || '';
+    document.getElementById('cartao-vencimento').value = cart.diaVencimento || '';
+    if (cart.contaPagamentoId) sel.value = cart.contaPagamentoId;
+    // dia de fechamento não é mais editável aqui depois de criado — usa o botão "Fechar fatura"
+    document.getElementById('cartao-fechamento-campo').style.display = 'none';
+    document.getElementById('cartao-fechamento').required = false;
+  } else {
+    document.getElementById('cartao-sheet-title').textContent = 'Novo cartão';
+    document.getElementById('cartao-submit-btn').textContent = 'Salvar cartão';
+    document.getElementById('cartao-fechamento-campo').style.display = '';
+    document.getElementById('cartao-fechamento').required = true;
+  }
+
+  document.getElementById('overlay-cartao').classList.add('open');
+};
 
 window.abrirFormLancamento = function(){ document.getElementById('overlay-lancamento').classList.add('open'); };
 
@@ -1087,8 +1148,9 @@ window.salvarDespesa = async function(e){
   const contaId = document.getElementById('despesa-conta').value;
   const contaObj = contas.find(c => c.id === contaId);
   const tipo = document.getElementById('despesa-tipo').value;
+  const grupo = document.getElementById('despesa-grupo').value;
   const vencimento = document.getElementById('despesa-vencimento').value; // YYYY-MM-DD
-  const dados = { nome, valor, categoria, contaId, contaNome: contaObj ? contaObj.nome : '', tipo, vencimento };
+  const dados = { nome, valor, categoria, contaId, contaNome: contaObj ? contaObj.nome : '', tipo, grupo, vencimento };
   const editando = !!despesaEditandoId;
   try{
     if (editando){
@@ -1747,16 +1809,69 @@ window.salvarCartao = async function(e){
   const nome = document.getElementById('cartao-nome').value.trim();
   const final = document.getElementById('cartao-final').value.trim();
   const limiteTotal = parseFloat(document.getElementById('cartao-limite').value || 0);
-  const diaFechamento = parseInt(document.getElementById('cartao-fechamento').value || 25);
   const diaVencimento = parseInt(document.getElementById('cartao-vencimento').value || 5);
+  const contaPagamentoId = document.getElementById('cartao-conta-pagamento').value || null;
+  const contaObj = contas.find(c => c.id === contaPagamentoId);
   try{
-    await addDoc(collection(db, 'cartoes'), { nome, final, limiteTotal, diaFechamento, diaVencimento, criadoEm: serverTimestamp() });
-    toast('Cartão salvo!');
+    if (cartaoEditandoId){
+      await updateDoc(doc(db, 'cartoes', cartaoEditandoId), {
+        nome, final, limiteTotal, diaVencimento, contaPagamentoId, contaPagamentoNome: contaObj ? contaObj.nome : ''
+      });
+      toast('Cartão atualizado!');
+    } else {
+      const diaFechamento = parseInt(document.getElementById('cartao-fechamento').value || 25);
+      const hoje = new Date().toISOString().slice(0,10);
+      await addDoc(collection(db, 'cartoes'), {
+        nome, final, limiteTotal, diaFechamento, diaVencimento, contaPagamentoId, contaPagamentoNome: contaObj ? contaObj.nome : '',
+        historicoFechamento: [{ desde: hoje, dia: diaFechamento }],
+        criadoEm: serverTimestamp()
+      });
+      toast('Cartão salvo!');
+    }
     document.getElementById('form-cartao').reset();
     fecharForm('overlay-cartao');
+    cartaoEditandoId = null;
   }catch(err){
     console.error(err);
     toast('Erro ao salvar. Veja o console.');
+  }
+};
+
+window.fecharFaturaAtual = async function(){
+  const cart = cartoes.find(c => c.id === cartaoAbertoId);
+  if (!cart) return;
+  const novoDiaStr = prompt('Fatura fechada! Qual será o dia de fechamento da PRÓXIMA fatura?', cart.diaFechamento);
+  if (!novoDiaStr) return;
+  const novoDia = parseInt(novoDiaStr);
+  if (isNaN(novoDia) || novoDia < 1 || novoDia > 31){ toast('Dia inválido'); return; }
+  const amanha = new Date(); amanha.setDate(amanha.getDate()+1);
+  const desde = amanha.toISOString().slice(0,10);
+  const historico = [...(cart.historicoFechamento||[{desde:'2000-01-01', dia:cart.diaFechamento}]), { desde, dia: novoDia }];
+  try{
+    await updateDoc(doc(db, 'cartoes', cart.id), { diaFechamento: novoDia, historicoFechamento: historico });
+    toast(`Próximas compras a partir de amanhã já usam o fechamento dia ${novoDia}`);
+  }catch(err){
+    console.error(err);
+    toast('Erro ao atualizar. Veja o console.');
+  }
+};
+
+window.marcarFaturaComoPaga = async function(){
+  const cart = cartoes.find(c => c.id === cartaoAbertoId);
+  if (!cart) return;
+  if (!cart.contaPagamentoId){ toast('Cadastre uma conta de pagamento pra esse cartão primeiro (editar cartão)'); return; }
+  const chaveFatura = mesChave(mesFatura);
+  const total = totalFaturaDe(cart.id, chaveFatura);
+  if (total <= 0){ toast('Nada a pagar nesta fatura'); return; }
+  const contaObj = contas.find(c => c.id === cart.contaPagamentoId);
+  if (!contaObj){ toast('Conta de pagamento não encontrada'); return; }
+  if (!confirm(`Marcar fatura de ${brl(total)} como paga, debitando de ${contaObj.nome}?`)) return;
+  try{
+    await updateDoc(doc(db, 'contas', contaObj.id), { saldo: (contaObj.saldo||0) - total });
+    toast(`Fatura paga — ${brl(total)} debitado de ${contaObj.nome}`);
+  }catch(err){
+    console.error(err);
+    toast('Erro ao marcar como paga. Veja o console.');
   }
 };
 
@@ -1767,7 +1882,17 @@ window.excluirCartao = async function(id){
 };
 
 // Determina em qual mês de VENCIMENTO (YYYY-MM) uma compra cai, dado o dia de fechamento do cartão
-function mesFaturaDe(dataCompraISO, diaFechamento){
+// Descobre qual "dia de fechamento" valia numa determinada data, usando o histórico do cartão
+function diaFechamentoEm(cart, dataISO){
+  const hist = (cart.historicoFechamento && cart.historicoFechamento.length)
+    ? cart.historicoFechamento
+    : [{ desde:'2000-01-01', dia: cart.diaFechamento||25 }];
+  const aplicaveis = hist.filter(h => h.desde <= dataISO).sort((a,b)=> a.desde.localeCompare(b.desde));
+  return aplicaveis.length ? aplicaveis[aplicaveis.length-1].dia : hist[0].dia;
+}
+
+function mesFaturaDe(dataCompraISO, cart){
+  const diaFechamento = diaFechamentoEm(cart, dataCompraISO);
   const d = new Date(dataCompraISO + 'T00:00:00');
   let mes = d.getMonth(); // 0-indexed
   let ano = d.getFullYear();
@@ -1790,7 +1915,7 @@ function itensDaFaturaPara(cartaoId, chaveFatura){
   lancamentosCartao.filter(l => l.cartaoId === cartaoId).forEach(l => {
     const cart = cartoes.find(c => c.id === cartaoId);
     if (!cart) return;
-    const mesBase = mesFaturaDe(l.data, cart.diaFechamento); // mês em que a parcela registrada (parcelaAtual) cai
+    const mesBase = mesFaturaDe(l.data, cart); // mês em que a parcela registrada (parcelaAtual) cai
     const [anoBase, mesBaseNum] = mesBase.split('-').map(Number);
     const totalParcelas = l.parcelaTotal > 1 ? l.parcelaTotal : 1;
     for (let p = (l.parcelaAtual||1); p <= totalParcelas; p++){
@@ -1800,7 +1925,7 @@ function itensDaFaturaPara(cartaoId, chaveFatura){
       if (chave === chaveFatura){
         itens.push({
           origemId: l.id, real: offset === 0, descricao: l.descricao, categoria: l.categoria,
-          data: l.data, valor: valorParcelaDe(l), parcelaAtual: p, parcelaTotal: totalParcelas, tipo: l.tipo
+          data: l.data, valor: valorParcelaDe(l), parcelaAtual: p, parcelaTotal: totalParcelas, tipo: l.tipo, grupo: l.grupo
         });
       }
     }
@@ -1822,7 +1947,7 @@ function renderCartoes(){
   } else {
     const hojeISO = new Date().toISOString().slice(0,10);
     listaEl.innerHTML = cartoes.map(cart => {
-      const chaveAberta = mesFaturaDe(hojeISO, cart.diaFechamento); // fatura que ainda está "aberta" (acumulando)
+      const chaveAberta = mesFaturaDe(hojeISO, cart); // fatura que ainda está "aberta" (acumulando)
       const totalFatura = totalFaturaDe(cart.id, chaveAberta);
       const limiteDisp = (cart.limiteTotal||0) - totalFatura;
       const usoRatio = cart.limiteTotal > 0 ? Math.min(1, totalFatura/cart.limiteTotal) : 0;
@@ -1833,6 +1958,7 @@ function renderCartoes(){
             <div style="font-weight:600; font-size:15px">${cart.nome}</div>
             <div class="muted">${cart.final ? 'final '+cart.final : 'cartão de crédito'}</div>
           </div>
+          <button class="del-btn" onclick="event.stopPropagation(); abrirFormCartao('${cart.id}')">✏️</button>
           <button class="del-btn" onclick="event.stopPropagation(); excluirCartao('${cart.id}')">✕</button>
         </div>
         <div class="barra" style="margin-top:12px"><div class="barra-fill" style="width:${usoRatio*100}%"></div></div>
@@ -1883,7 +2009,7 @@ function renderFatura(){
   document.getElementById('fatura-cartao-nome').textContent = cart.nome.toUpperCase() + (cart.final ? ' · FINAL '+cart.final : '');
   document.getElementById('fatura-titulo').textContent = 'Fatura de ' + NOMES_MES[mesFatura.getMonth()];
   document.getElementById('fatura-mes-label').textContent = NOMES_MES[mesFatura.getMonth()] + '/' + mesFatura.getFullYear();
-  document.getElementById('fatura-fechamento-info').textContent = `Fecha dia ${cart.diaFechamento} · Vence dia ${cart.diaVencimento}`;
+  document.getElementById('fatura-fechamento-info').textContent = `Fecha dia ${diaFechamentoEm(cart, new Date().toISOString().slice(0,10))} (atual) · Vence dia ${cart.diaVencimento}`;
 
   const itensFatura = itensDaFaturaPara(cart.id, chaveFatura).sort((a,b)=> (b.data||'').localeCompare(a.data||''));
   const totalFatura = itensFatura.reduce((s,it)=> s + it.valor, 0);
@@ -1965,13 +2091,14 @@ window.salvarLancamento = async function(e){
   const data = document.getElementById('lanc-data').value;
   const categoria = document.getElementById('lanc-categoria').value;
   const tipo = document.getElementById('lanc-tipo').value;
+  const grupo = document.getElementById('lanc-grupo').value;
   const parcelado = document.getElementById('lanc-parcelado').value === 'sim';
   const parcelaAtual = parcelado ? parseInt(document.getElementById('lanc-parcela-atual').value || 1) : 1;
   const parcelaTotal = parcelado ? parseInt(document.getElementById('lanc-parcela-total').value || 1) : 1;
   const valorParcela = parcelaTotal > 1 ? valor/parcelaTotal : valor; // "Valor" informado é o TOTAL da compra
   try{
     await addDoc(collection(db, 'lancamentosCartao'), {
-      cartaoId: cartaoAbertoId, descricao, valor, valorParcela, data, categoria, tipo, parcelaAtual, parcelaTotal, criadoEm: serverTimestamp()
+      cartaoId: cartaoAbertoId, descricao, valor, valorParcela, data, categoria, tipo, grupo, parcelaAtual, parcelaTotal, criadoEm: serverTimestamp()
     });
     toast('Lançamento salvo!');
     document.getElementById('form-lancamento').reset();
@@ -2202,17 +2329,17 @@ function renderDistribuicaoMes(chaveMes, totalReceitas){
   const el = document.getElementById('home-distribuicao');
   if (!el) return;
 
-  // despesas avulsas do mês, por grupo
+  // despesas avulsas do mês, por grupo (usa o grupo escolhido no lançamento; se não tiver — dados antigos — cai no mapa por categoria)
   const somaGrupo = { Essencial:0, Lazer:0, Investimento:0 };
   despesas.filter(d => (d.vencimento||'').startsWith(chaveMes)).forEach(d => {
-    const grupo = CATEGORIA_GRUPO[d.categoria] || 'Essencial';
+    const grupo = d.grupo || CATEGORIA_GRUPO[d.categoria] || 'Essencial';
     somaGrupo[grupo] += (d.valor||0);
   });
 
   // gastos de cartão do mês, também por grupo (usa a mesma lógica de alocação da fatura)
   cartoes.forEach(cart => {
     itensDaFaturaPara(cart.id, chaveMes).forEach(it => {
-      const grupo = CATEGORIA_GRUPO[it.categoria] || 'Essencial';
+      const grupo = it.grupo || CATEGORIA_GRUPO[it.categoria] || 'Essencial';
       somaGrupo[grupo] += it.valor;
     });
   });
@@ -2246,7 +2373,7 @@ function renderDistribuicaoMes(chaveMes, totalReceitas){
         <span class="mono" style="color:${cor}; font-size:13.5px">${pct.toFixed(0)}% <span class="muted" style="font-size:11px">/ meta ${meta}%</span></span>
       </div>
       <div class="barra" style="margin-top:8px"><div class="barra-fill" style="width:${Math.min(100,pct)}%; background:${cor}"></div></div>
-      ${foraDaMeta ? `<div class="muted" style="margin-top:6px; color:var(--terracota)">Acima da meta em ${(pct-meta).toFixed(0)} pontos</div>` : ''}
+      ${foraDaMeta ? `<div class="muted" style="margin-top:6px; color:var(--terracota)">Acima da meta em ${(pct-meta).toFixed(0)}%</div>` : ''}
     </div>`;
   }).join('');
 }
