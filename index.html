@@ -1287,6 +1287,32 @@ function renderDespesas(){
 }
 
 // Projeção de receitas x despesas do mês sendo visualizado (inclusive meses futuros)
+// Saldo acumulado projetado até o fim de um mês específico, partindo do saldo atual em contas
+// (mês atual: só considera o que ainda falta receber/pagar; meses futuros: soma tudo, mês a mês, encadeado)
+function projecaoSaldoAteMes(dataMes){
+  const chaveHoje = mesChave(new Date());
+  const chaveAlvo = mesChave(dataMes);
+  let saldo = contas.reduce((s,c)=> s + (c.saldo||0), 0);
+  if (chaveAlvo < chaveHoje) return saldo;
+
+  const despesasPendentesHoje = despesas.filter(d => (d.vencimento||'').startsWith(chaveHoje) && !d.pago).reduce((s,d)=>s+(d.valor||0),0);
+  const receitasPendentesHoje = entradas.filter(en => (en.data||'').startsWith(chaveHoje) && !en.recebido).reduce((s,en)=>s+(en.valor||0),0);
+  const faturaHoje = cartoes.reduce((s,c)=> s + totalFaturaDe(c.id, chaveHoje), 0);
+  saldo += receitasPendentesHoje - despesasPendentesHoje - faturaHoje;
+  if (chaveAlvo === chaveHoje) return saldo;
+
+  let d = new Date(new Date().getFullYear(), new Date().getMonth()+1, 1);
+  while (mesChave(d) <= chaveAlvo){
+    const chave = mesChave(d);
+    const desp = despesas.filter(x => (x.vencimento||'').startsWith(chave)).reduce((s,x)=>s+(x.valor||0),0);
+    const rec = entradas.filter(x => (x.data||'').startsWith(chave)).reduce((s,x)=>s+(x.valor||0),0);
+    const fat = cartoes.reduce((s,c)=> s + totalFaturaDe(c.id, chave), 0);
+    saldo += rec - desp - fat;
+    d.setMonth(d.getMonth()+1);
+  }
+  return saldo;
+}
+
 function renderProjecaoMes(chave, doMes){
   const el = document.getElementById('mes-projecao-card');
   if (!el) return;
@@ -1294,14 +1320,14 @@ function renderProjecaoMes(chave, doMes){
   const totalDespesasMes = doMes.reduce((s,d)=> s + (d.valor||0), 0)
     + cartoes.reduce((s,cart)=> s + totalFaturaDe(cart.id, chave), 0);
   const totalReceitasMes = entradas.filter(en => (en.data||'').startsWith(chave)).reduce((s,en)=> s + (en.valor||0), 0);
-  const saldoPrevisto = totalReceitasMes - totalDespesasMes;
+  const saldoAcumulado = projecaoSaldoAteMes(mesAtual);
 
   document.getElementById('mes-proj-receitas').textContent = brl(totalReceitasMes);
   document.getElementById('mes-proj-despesas').textContent = brl(totalDespesasMes);
-  document.getElementById('mes-proj-label').textContent = saldoPrevisto >= 0 ? 'Sobra prevista' : 'Falta prevista';
+  document.getElementById('mes-proj-label').textContent = 'Saldo previsto no fim do mês';
   const saldoEl = document.getElementById('mes-proj-saldo');
-  saldoEl.textContent = brl(Math.abs(saldoPrevisto));
-  saldoEl.style.color = saldoPrevisto >= 0 ? 'var(--green)' : 'var(--terracota)';
+  saldoEl.textContent = brl(saldoAcumulado);
+  saldoEl.style.color = saldoAcumulado >= 0 ? 'var(--green)' : 'var(--terracota)';
 }
 
 window.abrirFaturaNoMes = function(cartaoId, chave){
@@ -2070,14 +2096,17 @@ function renderHome(){
   const chaveMesAtualReal = mesChave(new Date());
   const doMesReal = despesas.filter(d => (d.vencimento||'').startsWith(chaveMesAtualReal));
   const totalSaidas = doMesReal.reduce((s,d)=> s + (d.valor||0), 0);
+  const totalEntradasMesTodas = entradas.filter(en => (en.data||'').startsWith(chaveMesAtualReal)).reduce((s,en)=> s + (en.valor||0), 0);
   const totalEntradasMes = entradas.filter(en => (en.data||'').startsWith(chaveMesAtualReal) && en.recebido).reduce((s,en)=> s + (en.valor||0), 0);
   const saldoContas = contas.reduce((s,c)=> s + (c.saldo||0), 0);
   const faltaPagarValor = doMesReal.filter(d=>!d.pago).reduce((s,d)=>s+(d.valor||0),0);
-  const saldoProjetado = saldoContas - faltaPagarValor;
+  const totalDespesasComFatura = totalSaidas + cartoes.reduce((s,cart)=> s + totalFaturaDe(cart.id, chaveMesAtualReal), 0);
+  // mesma função usada no card de projeção da aba Contas — garante que os dois números batem sempre
+  const saldoProjetado = projecaoSaldoAteMes(new Date());
 
   document.getElementById('home-saldo-projetado').textContent = brl(saldoContas);
   document.getElementById('home-projecao').textContent = `Projeção fim do mês: ${brl(saldoProjetado)}`;
-  document.getElementById('home-entradas-saidas').textContent = `Entradas ${brl(totalEntradasMes)} · Saídas do mês ${brl(totalSaidas)}`;
+  document.getElementById('home-entradas-saidas').textContent = `Entradas ${brl(totalEntradasMesTodas)} · Saídas do mês ${brl(totalDespesasComFatura)}`;
 
   // --- Alerta de risco ---
   const alertaEl = document.getElementById('home-alerta');
@@ -2165,7 +2194,7 @@ function renderHome(){
     compTextoEl.textContent = `Mês anterior: ${brl(totalAnterior)}  ·  Este mês: ${brl(totalSaidas)}`;
   }
 
-  renderDistribuicaoMes(chaveMesAtualReal, totalEntradasMes);
+  renderDistribuicaoMes(chaveMesAtualReal, totalEntradasMesTodas);
 }
 
 // --- Distribuição Essencial / Lazer / Investimento, comparada com a meta ---
