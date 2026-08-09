@@ -1118,6 +1118,23 @@ window.togglePago = async function(id, atual, contaId, valor){
 };
 
 window.excluirDespesa = async function(id){
+  const d = despesas.find(x => x.id === id);
+  if (!d) return;
+
+  if (d.recorrenciaId){
+    const excluirSerie = confirm('Essa despesa faz parte de uma série fixa (se repete todo mês).\n\nOK = excluir a SÉRIE INTEIRA (todos os meses)\nCancelar = excluir só este mês');
+    if (excluirSerie){
+      const serie = despesas.filter(x => x.recorrenciaId === d.recorrenciaId);
+      for (const item of serie){ await deleteDoc(doc(db, 'despesas', item.id)); }
+      toast(`Série excluída (${serie.length} lançamentos)`);
+      return;
+    }
+    if (!confirm('Excluir só este mês (' + formatarData(d.vencimento) + ')?')) return;
+    await deleteDoc(doc(db, 'despesas', id));
+    toast('Despesa excluída');
+    return;
+  }
+
   if (!confirm('Excluir esta despesa?')) return;
   await deleteDoc(doc(db, 'despesas', id));
   toast('Despesa excluída');
@@ -1173,7 +1190,24 @@ window.toggleRecebido = async function(id, atual, contaId, valor){
 
 window.excluirEntrada = async function(id){
   const en = entradas.find(e => e.id === id);
-  if (!confirm('Excluir esta receita?' + (en && en.recebido ? ' O valor já somado no saldo não será removido automaticamente.' : ''))) return;
+  if (!en) return;
+  const avisoRecebida = en.recebido ? ' O valor já somado no saldo não será removido automaticamente.' : '';
+
+  if (en.recorrenciaId){
+    const excluirSerie = confirm('Essa receita faz parte de uma série fixa (se repete todo mês).\n\nOK = excluir a SÉRIE INTEIRA (todos os meses)\nCancelar = excluir só este mês' + avisoRecebida);
+    if (excluirSerie){
+      const serie = entradas.filter(e => e.recorrenciaId === en.recorrenciaId);
+      for (const item of serie){ await deleteDoc(doc(db, 'entradas', item.id)); }
+      toast(`Série excluída (${serie.length} lançamentos)`);
+      return;
+    }
+    if (!confirm('Excluir só este mês (' + formatarData(en.data) + ')?')) return;
+    await deleteDoc(doc(db, 'entradas', id));
+    toast('Receita excluída');
+    return;
+  }
+
+  if (!confirm('Excluir esta receita?' + avisoRecebida)) return;
   await deleteDoc(doc(db, 'entradas', id));
   toast('Receita excluída');
 };
