@@ -2347,17 +2347,9 @@ function renderDistribuicaoMes(chaveMes, totalReceitas){
     somaGrupo[grupo] += valorParcelaDe(l);
   });
 
-  // investimentos novos criados no mês entram como "Investimento"
-  investimentos.forEach(inv => {
-    if (!inv.criadoEm || !inv.criadoEm.toDate) return;
-    const chaveInv = mesChave(inv.criadoEm.toDate());
-    if (chaveInv !== chaveMes) return;
-    let valorAporte = 0;
-    if (inv.tipo === 'Renda Fixa') valorAporte = inv.valorInvestido || inv.valorManual || 0;
-    else if (inv.quantidade) valorAporte = inv.quantidade * (inv.precoMedio||0);
-    else valorAporte = inv.valorManual || 0;
-    somaGrupo.Investimento += valorAporte;
-  });
+  // "Investimento" só conta o que foi marcado com esse grupo em despesas/lançamentos de cartão
+  // (o mesmo mecanismo do Essencial e Lazer) — não soma nada da aba Investimentos direto,
+  // pra não misturar "quanto já tenho investido" com "quanto separei pra investir esse mês".
 
   if (totalReceitas <= 0){
     el.innerHTML = '<p class="empty-hint">Confirme receitas do mês pra calcular a distribuição</p>';
@@ -2377,7 +2369,8 @@ function renderDistribuicaoMes(chaveMes, totalReceitas){
         <span class="mono" style="color:${cor}; font-size:13.5px">${pctUsado.toFixed(0)}% da meta</span>
       </div>
       <div class="barra" style="margin-top:8px"><div class="barra-fill" style="width:${Math.min(100,pctUsado)}%; background:${cor}"></div></div>
-      <div class="muted" style="margin-top:6px">${brl(val)} de ${brl(orcamento)} (orçamento de ${meta}% da receita)</div>
+      <div class="muted" style="margin-top:6px">Orçamento (${meta}% da receita): <span class="mono">${brl(orcamento)}</span></div>
+      <div class="muted" style="margin-top:2px">Gasto no mês: <span class="mono" style="color:${cor}">${brl(val)}</span></div>
       ${foraDaMeta ? `<div class="muted" style="margin-top:4px; color:var(--terracota)">Passou do orçamento em ${brl(val-orcamento)}</div>` : ''}
     </div>`;
   }).join('');
