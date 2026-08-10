@@ -186,7 +186,7 @@
       <button class="acao-btn" onclick="mudarView('investimentos'); setTimeout(abrirFormInvestimento, 150)">
         <span class="acao-icone">+</span>Investir
       </button>
-      <button class="acao-btn" onclick="toast('Cartões ainda em construção')">
+      <button class="acao-btn" onclick="mudarView('cartoes')">
         <span class="acao-icone">↑</span>Fatura
       </button>
     </div>
@@ -608,6 +608,19 @@
         <input type="date" id="despesa-vencimento" required>
       </div>
       <div class="campo">
+        <label>É parcelada?</label>
+        <div class="seg">
+          <button type="button" class="active" data-val="nao" onclick="toggleParceladoDespesa(this)">Não</button>
+          <button type="button" data-val="sim" onclick="toggleParceladoDespesa(this)">Sim</button>
+        </div>
+        <input type="hidden" id="despesa-parcelada" value="nao">
+      </div>
+      <div class="campo" id="despesa-parcelas-campo" style="display:none">
+        <label>Em quantas parcelas</label>
+        <input type="number" min="2" inputmode="numeric" id="despesa-parcelas-total" placeholder="Ex: 4">
+        <div class="hint muted" style="margin-top:6px">Repete o mesmo valor todo mês, por essa quantidade de vezes.</div>
+      </div>
+      <div class="campo">
         <label>Grupo</label>
         <div class="seg">
           <button type="button" class="active" data-val="Essencial" onclick="toggleSeg(this)">Essencial</button>
@@ -788,6 +801,26 @@
           <input type="date" id="inv-data-fim">
         </div>
         <div class="hint muted" style="margin:-8px 2px 16px">O valor atualizado é calculado automaticamente mês a mês.</div>
+      </div>
+
+      <div id="inv-bloco-cdi" style="display:none">
+        <div class="campo">
+          <label>Valor investido</label>
+          <input type="number" step="0.01" inputmode="decimal" id="inv-cdi-valor-investido" placeholder="0,00">
+        </div>
+        <div class="campo">
+          <label>% do CDI</label>
+          <input type="number" step="0.01" inputmode="decimal" id="inv-cdi-percentual" placeholder="Ex: 100">
+        </div>
+        <div class="campo">
+          <label>Data de início</label>
+          <input type="date" id="inv-cdi-data-inicio">
+        </div>
+        <div class="campo">
+          <label>Data de vencimento</label>
+          <input type="date" id="inv-cdi-data-fim">
+        </div>
+        <div class="hint muted" style="margin:-8px 2px 16px">Busca o CDI atual automaticamente (fonte pública do Banco Central) e calcula mês a mês. Toque em "🔄 Atualizar cotações" pra atualizar a taxa.</div>
       </div>
 
       <div id="inv-bloco-manual" style="display:none">
@@ -974,6 +1007,11 @@ window.abrirFormCartao = function(id){
 
 window.abrirFormLancamento = function(){ document.getElementById('overlay-lancamento').classList.add('open'); };
 
+window.toggleParceladoDespesa = function(btn){
+  toggleSeg(btn);
+  document.getElementById('despesa-parcelas-campo').style.display = btn.dataset.val === 'sim' ? '' : 'none';
+};
+
 window.toggleParcelado = function(btn){
   toggleSeg(btn);
   const sim = btn.dataset.val === 'sim';
@@ -1012,6 +1050,10 @@ window.abrirFormInvestimento = function(id){
       document.getElementById('inv-taxa').value = inv.taxaAnual || '';
       document.getElementById('inv-data-inicio').value = inv.dataInicio || '';
       document.getElementById('inv-data-fim').value = inv.dataFim || '';
+      document.getElementById('inv-cdi-valor-investido').value = inv.valorInvestido || '';
+      document.getElementById('inv-cdi-percentual').value = inv.percentualCDI || '';
+      document.getElementById('inv-cdi-data-inicio').value = inv.dataInicio || '';
+      document.getElementById('inv-cdi-data-fim').value = inv.dataFim || '';
       document.getElementById('inv-valor-manual').value = inv.valorManual || '';
     } else if (inv.tipo === 'Renda Variável'){
       document.getElementById('inv-segmento-rv').value = inv.segmento || 'Ações';
@@ -1046,6 +1088,7 @@ window.toggleTipoInvestimento = function(btn){
   rvBloco.style.display = 'none';
   criptoBloco.style.display = 'none';
   document.getElementById('inv-bloco-prefixado').style.display = 'none';
+  document.getElementById('inv-bloco-cdi').style.display = 'none';
   document.getElementById('inv-bloco-manual').style.display = 'none';
 
   if (tipo === 'Renda Fixa'){
@@ -1062,9 +1105,12 @@ window.toggleTipoInvestimento = function(btn){
 
 function aplicarModalidadeVisual(modalidade){
   const pre = document.getElementById('inv-bloco-prefixado');
+  const cdi = document.getElementById('inv-bloco-cdi');
   const man = document.getElementById('inv-bloco-manual');
-  if (modalidade === 'Pré-fixado'){ pre.style.display=''; man.style.display='none'; }
-  else { pre.style.display='none'; man.style.display=''; }
+  pre.style.display = 'none'; cdi.style.display = 'none'; man.style.display = 'none';
+  if (modalidade === 'Pré-fixado'){ pre.style.display=''; }
+  else if (modalidade === 'Pós-fixado (CDI)'){ cdi.style.display=''; }
+  else { man.style.display=''; }
 }
 window.aplicarModalidadeVisual = aplicarModalidadeVisual;
 
@@ -1185,6 +1231,7 @@ async function manterRecorrenciasEmDia(lista, colecaoNome, campoData){
   const hoje = new Date();
   for (const [recId, itens] of Object.entries(grupos)){
     if (recorrenciasEmExtensao.has(recId)) continue;
+    if (itens.some(it => it.finita)) continue; // parcelamento com fim definido — nunca estende sozinho
     const datas = itens.map(it => new Date(it[campoData] + 'T00:00:00').getTime());
     const maxData = new Date(Math.max(...datas));
     const mesesAFrente = (maxData.getFullYear()-hoje.getFullYear())*12 + (maxData.getMonth()-hoje.getMonth());
@@ -1213,27 +1260,44 @@ window.salvarDespesa = async function(e){
   const tipo = document.getElementById('despesa-tipo').value;
   const grupo = document.getElementById('despesa-grupo').value;
   const vencimento = document.getElementById('despesa-vencimento').value; // YYYY-MM-DD
+  const parcelada = document.getElementById('despesa-parcelada').value === 'sim';
+  const parcelasTotal = parcelada ? parseInt(document.getElementById('despesa-parcelas-total').value || 2) : 1;
   const dados = { nome, valor, categoria, contaId, contaNome: contaObj ? contaObj.nome : '', tipo, grupo, vencimento };
   const editando = !!despesaEditandoId;
   try{
     if (editando){
       await updateDoc(doc(db, 'despesas', despesaEditandoId), dados);
       toast('Despesa atualizada!');
-    } else {
-      if (tipo === 'Fixa'){
-        const recorrenciaId = 'r' + Date.now() + Math.random().toString(36).slice(2,8);
-        recorrenciasEmExtensao.add(recorrenciaId); // trava a auto-extensão até terminarmos de criar a série inicial
-        try{
-          await addDoc(collection(db, 'despesas'), { ...dados, pago:false, recorrenciaId, criadoEm: serverTimestamp() });
-          await gerarRecorrencia('despesas', { ...dados, pago:false, recorrenciaId }, 'vencimento', MESES_RECORRENCIA);
-        } finally {
-          recorrenciasEmExtensao.delete(recorrenciaId);
+    } else if (parcelada && parcelasTotal > 1){
+      const recorrenciaId = 'r' + Date.now() + Math.random().toString(36).slice(2,8);
+      recorrenciasEmExtensao.add(recorrenciaId); // finita: nunca deixa a auto-extensão mexer nela
+      try{
+        for (let p = 1; p <= parcelasTotal; p++){
+          const d = new Date(vencimento + 'T00:00:00');
+          d.setMonth(d.getMonth() + (p-1));
+          const iso = d.toISOString().slice(0,10);
+          await addDoc(collection(db, 'despesas'), {
+            ...dados, vencimento: iso, pago:false, recorrenciaId, finita:true,
+            parcelaAtual: p, parcelaTotal: parcelasTotal, criadoEm: serverTimestamp()
+          });
         }
-        toast('Despesa salva — vai se repetir todo mês automaticamente, sem limite.');
-      } else {
-        await addDoc(collection(db, 'despesas'), { ...dados, pago:false, criadoEm: serverTimestamp() });
-        toast('Despesa salva!');
+      } finally {
+        recorrenciasEmExtensao.delete(recorrenciaId);
       }
+      toast(`Despesa parcelada em ${parcelasTotal}x criada até ${NOMES_MES[new Date(vencimento+'T00:00:00').getMonth()]}...`);
+    } else if (tipo === 'Fixa'){
+      const recorrenciaId = 'r' + Date.now() + Math.random().toString(36).slice(2,8);
+      recorrenciasEmExtensao.add(recorrenciaId); // trava a auto-extensão até terminarmos de criar a série inicial
+      try{
+        await addDoc(collection(db, 'despesas'), { ...dados, pago:false, recorrenciaId, criadoEm: serverTimestamp() });
+        await gerarRecorrencia('despesas', { ...dados, pago:false, recorrenciaId }, 'vencimento', MESES_RECORRENCIA);
+      } finally {
+        recorrenciasEmExtensao.delete(recorrenciaId);
+      }
+      toast('Despesa salva — vai se repetir todo mês automaticamente, sem limite.');
+    } else {
+      await addDoc(collection(db, 'despesas'), { ...dados, pago:false, criadoEm: serverTimestamp() });
+      toast('Despesa salva!');
     }
     document.getElementById('form-despesa').reset();
     fecharForm('overlay-despesa');
@@ -1400,7 +1464,7 @@ function renderDespesas(){
         <div class="check ${d.pago ? 'on' : ''}" onclick="togglePago('${d.id}', ${d.pago}, '${d.contaId||''}', ${d.valor||0})">${d.pago ? '✓' : ''}</div>
         <div class="despesa-info">
           <div class="despesa-nome">${d.nome}</div>
-          <div class="despesa-sub">${d.categoria} · ${d.contaNome || 'sem conta'} · vence ${formatarData(d.vencimento)}</div>
+          <div class="despesa-sub">${d.categoria} · ${d.contaNome || 'sem conta'} · vence ${formatarData(d.vencimento)}${d.parcelaTotal>1 ? ' · '+d.parcelaAtual+'/'+d.parcelaTotal : ''}</div>
         </div>
         <div class="despesa-valor ${d.tipo === 'Fixa' ? 'fixa' : 'variavel'}">${brl(d.valor||0)}</div>
         <button class="del-btn" onclick="abrirFormDespesa('${d.id}')">✏️</button>
@@ -1515,6 +1579,12 @@ window.salvarInvestimento = async function(e){
       dados.taxaAnual = parseFloat(document.getElementById('inv-taxa').value || 0);
       dados.dataInicio = document.getElementById('inv-data-inicio').value;
       dados.dataFim = document.getElementById('inv-data-fim').value;
+    } else if (modalidade === 'Pós-fixado (CDI)'){
+      dados.valorInvestido = parseFloat(document.getElementById('inv-cdi-valor-investido').value || 0);
+      dados.percentualCDI = parseFloat(document.getElementById('inv-cdi-percentual').value || 100);
+      dados.dataInicio = document.getElementById('inv-cdi-data-inicio').value;
+      dados.dataFim = document.getElementById('inv-cdi-data-fim').value;
+      dados.cdiAnual = null; // preenchido pela busca automática
     } else {
       dados.valorManual = parseFloat(document.getElementById('inv-valor-manual').value || 0);
     }
@@ -1556,6 +1626,7 @@ window.salvarInvestimento = async function(e){
     if (tickerMudou){
       if (dados.ticker) buscarCotacaoAcaoFii(id, dados.ticker);
       if (dados.simbolo && dados.simbolo !== 'OUTRO') buscarCotacaoCripto(id, dados.simbolo);
+      if (dados.modalidade === 'Pós-fixado (CDI)') buscarCDI(id);
     }
   }catch(err){
     console.error(err);
@@ -1577,9 +1648,15 @@ window.registrarRendimento = async function(investId, contaId, contaNome){
   if (isNaN(valor) || valor <= 0){ toast('Valor inválido'); return; }
   const contaObj = contas.find(c => c.id === contaId);
   if (!contaObj){ toast('Conta não encontrada'); return; }
+  const inv = investimentos.find(i => i.id === investId);
   try{
     await updateDoc(doc(db, 'contas', contaId), { saldo: (contaObj.saldo||0) + valor });
-    toast(`Rendimento de ${brl(valor)} somado em ${contaNome}`);
+    await addDoc(collection(db, 'entradas'), {
+      nome: `Rendimento — ${inv ? inv.nomeAtivo : 'investimento'}`, valor, categoria: 'Rendimentos', tipo: 'Variável',
+      contaId, contaNome, data: new Date().toISOString().slice(0,10), recebido: true,
+      investimentoId: investId, criadoEm: serverTimestamp()
+    });
+    toast(`Rendimento de ${brl(valor)} somado em ${contaNome} e registrado nas receitas`);
   }catch(err){
     console.error(err);
     toast('Erro ao registrar. Veja o console.');
@@ -1591,15 +1668,24 @@ const BRAPI_TOKEN = 'w9von59JFUm4uJJWywYBHz';
 // Busca a cotação de uma ação/FII via brapi.dev (com token gratuito)
 async function buscarCotacaoAcaoFii(investId, ticker){
   try{
-    const resp = await fetch(`https://brapi.dev/api/quote/${ticker}?token=${BRAPI_TOKEN}`);
+    const resp = await fetch(`https://brapi.dev/api/quote/${ticker}?token=${BRAPI_TOKEN}&dividends=true`);
     if (!resp.ok) throw new Error('HTTP '+resp.status);
     const json = await resp.json();
     const preco = json?.results?.[0]?.regularMarketPrice;
-    if (typeof preco === 'number'){
-      await updateDoc(doc(db, 'investimentos', investId), { valorMercado: preco, cotacaoAtualizadaEm: serverTimestamp() });
-      return true;
+    const dados = { cotacaoAtualizadaEm: serverTimestamp() };
+    if (typeof preco === 'number') dados.valorMercado = preco;
+
+    // tentativa best-effort de achar provento/dividendo a receber neste mês (nem sempre disponível na API gratuita)
+    const cashDividends = json?.results?.[0]?.dividendsData?.cashDividends;
+    if (Array.isArray(cashDividends) && cashDividends.length){
+      const chaveMesAtual = mesChave(new Date());
+      const doMes = cashDividends.find(cd => (cd.paymentDate||cd.date||'').startsWith(chaveMesAtual));
+      dados.proventoMes = doMes ? { data: doMes.paymentDate||doMes.date, valor: doMes.rate } : null;
     }
-    throw new Error('Sem preço no retorno da API');
+
+    if (typeof preco !== 'number') throw new Error('Sem preço no retorno da API');
+    await updateDoc(doc(db, 'investimentos', investId), dados);
+    return true;
   }catch(err){
     console.warn('Não foi possível buscar cotação de', ticker, err);
     return false;
@@ -1632,17 +1718,37 @@ async function buscarCotacaoCripto(investId, simbolo){
   }
 }
 
+// Busca a taxa CDI anualizada atual via API pública do Banco Central (série SGS 4389 — CDI anualizado base 252)
+async function buscarCDI(investId){
+  try{
+    const resp = await fetch('https://api.bcb.gov.br/dados/serie/bcdata.sgs.4389/dados/ultimos/1?formato=json');
+    if (!resp.ok) throw new Error('HTTP '+resp.status);
+    const json = await resp.json();
+    const taxa = json?.[0]?.valor ? parseFloat(json[0].valor) : null;
+    if (typeof taxa === 'number' && !isNaN(taxa)){
+      await updateDoc(doc(db, 'investimentos', investId), { cdiAnual: taxa, cotacaoAtualizadaEm: serverTimestamp() });
+      return true;
+    }
+    throw new Error('Sem taxa no retorno da API');
+  }catch(err){
+    console.warn('Não foi possível buscar o CDI', err);
+    return false;
+  }
+}
+
 window.atualizarCotacoes = async function(){
   const acoesFiis = investimentos.filter(inv => inv.tipo === 'Renda Variável' && inv.ticker);
   const criptos = investimentos.filter(inv => inv.tipo === 'Cripto' && inv.simbolo && inv.simbolo !== 'OUTRO');
-  if (acoesFiis.length === 0 && criptos.length === 0){ toast('Nenhum ativo com ticker/símbolo pra atualizar'); return; }
+  const cdis = investimentos.filter(inv => inv.tipo === 'Renda Fixa' && inv.modalidade === 'Pós-fixado (CDI)');
+  if (acoesFiis.length === 0 && criptos.length === 0 && cdis.length === 0){ toast('Nenhum ativo pra atualizar'); return; }
   toast('Buscando cotações...');
   const resultados = await Promise.all([
     ...acoesFiis.map(inv => buscarCotacaoAcaoFii(inv.id, inv.ticker)),
-    ...criptos.map(inv => buscarCotacaoCripto(inv.id, inv.simbolo))
+    ...criptos.map(inv => buscarCotacaoCripto(inv.id, inv.simbolo)),
+    ...cdis.map(inv => buscarCDI(inv.id))
   ]);
   const falhas = resultados.filter(r => r === false).length;
-  toast(falhas === 0 ? 'Cotações atualizadas!' : `Atualizado — ${falhas} ativo(s) não encontrado(s), mantido o preço médio`);
+  toast(falhas === 0 ? 'Cotações atualizadas!' : `Atualizado — ${falhas} ativo(s) não encontrado(s), mantido o valor anterior`);
 };
 
 // Calcula o valor atualizado de uma posição pré-fixada (juros compostos, mês a mês)
@@ -1655,6 +1761,18 @@ function valorAtualInvestimento(inv){
     let meses = (limite.getFullYear() - inicio.getFullYear())*12 + (limite.getMonth() - inicio.getMonth());
     meses = Math.max(0, meses);
     const taxaMensal = Math.pow(1 + (inv.taxaAnual/100), 1/12) - 1;
+    return (inv.valorInvestido||0) * Math.pow(1 + taxaMensal, meses);
+  }
+  if (inv.tipo === 'Renda Fixa' && inv.modalidade === 'Pós-fixado (CDI)' && inv.dataInicio){
+    const inicio = new Date(inv.dataInicio + 'T00:00:00');
+    const fim = inv.dataFim ? new Date(inv.dataFim + 'T00:00:00') : null;
+    const hoje = new Date();
+    const limite = (fim && hoje > fim) ? fim : hoje;
+    let meses = (limite.getFullYear() - inicio.getFullYear())*12 + (limite.getMonth() - inicio.getMonth());
+    meses = Math.max(0, meses);
+    const cdiAnual = typeof inv.cdiAnual === 'number' ? inv.cdiAnual : 10.65; // respaldo aproximado se ainda não buscou
+    const taxaEfetivaAnual = cdiAnual * ((inv.percentualCDI||100)/100);
+    const taxaMensal = Math.pow(1 + (taxaEfetivaAnual/100), 1/12) - 1;
     return (inv.valorInvestido||0) * Math.pow(1 + taxaMensal, meses);
   }
   if ((inv.tipo === 'Renda Variável' || inv.tipo === 'Cripto') && inv.quantidade){
@@ -1727,6 +1845,7 @@ function renderInvestimentos(){
               <div class="despesa-nome">${inv.nomeAtivo}${inv.ticker ? ' · '+inv.ticker : ''}${inv.simbolo ? ' · '+inv.simbolo : ''}</div>
               <div class="despesa-sub">${inv.tipo}${inv.modalidade ? ' · '+inv.modalidade : ''}${inv.segmento ? ' · '+inv.segmento : ''}${inv.quantidade ? ' · '+inv.quantidade+' un.' : ''}</div>
               ${temCota ? `<div class="despesa-sub mono" style="margin-top:3px">Cota atual: ${brl(precoUnitarioAtual(inv))}${atualizouMercado ? '' : ' (preço médio — sem cotação ainda)'}</div>` : ''}
+              ${inv.proventoMes ? `<div class="despesa-sub" style="margin-top:3px; color:var(--green)">💰 Provento em ${formatarData(inv.proventoMes.data)}: ${brl((inv.proventoMes.valor||0)*(inv.quantidade||0))}</div>` : ''}
               ${variacao !== null ? `<div class="despesa-sub" style="color:${variacao>=0?'var(--green)':'var(--terracota)'}; margin-top:3px">${variacao>=0?'↑':'↓'} ${Math.abs(variacao).toFixed(1)}% vs preço médio</div>` : ''}
             </div>
             <div class="despesa-valor" style="color:${CORES_SEGMENTO[segmentoDe(inv)]}">${brl(valorAtual)}</div>
