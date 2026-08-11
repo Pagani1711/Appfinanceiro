@@ -1272,9 +1272,11 @@ window.salvarDespesa = async function(e){
       const recorrenciaId = 'r' + Date.now() + Math.random().toString(36).slice(2,8);
       recorrenciasEmExtensao.add(recorrenciaId); // finita: nunca deixa a auto-extensão mexer nela
       try{
+        const baseParcela = new Date(vencimento + 'T00:00:00');
+        const diaOriginalParcela = baseParcela.getDate();
         for (let p = 1; p <= parcelasTotal; p++){
-          const d = new Date(vencimento + 'T00:00:00');
-          d.setMonth(d.getMonth() + (p-1));
+          const d = new Date(baseParcela.getFullYear(), baseParcela.getMonth() + (p-1), diaOriginalParcela);
+          if (d.getDate() !== diaOriginalParcela) d.setDate(0); // mês sem esse dia -> cai no último dia do mês
           const iso = d.toISOString().slice(0,10);
           await addDoc(collection(db, 'despesas'), {
             ...dados, vencimento: iso, pago:false, recorrenciaId, finita:true,
