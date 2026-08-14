@@ -19,6 +19,7 @@
     --gold:#B9A06B;
     --gold-soft:#F0EBDD;
     --line:#E8E6DF;
+    --sidebar-w:232px;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{margin:0; padding:0; background:var(--navy);}
@@ -158,12 +159,116 @@
   .cat-legenda-item .nome{ flex:1; }
   .cat-legenda-item .pct{ font-family:'IBM Plex Mono',monospace; color:var(--ink-soft); font-size:11.5px; }
 
+  .kpi-strip{ display:none; }
+
   .toast{
     position:fixed; bottom:96px; left:50%; transform:translateX(-50%);
     background:var(--ink); color:#fff; padding:10px 18px; border-radius:99px; font-size:12.5px;
     z-index:200; opacity:0; pointer-events:none; transition:opacity .25s;
   }
   .toast.show{ opacity:1; }
+
+  /* ---------- Sidebar (desktop only) ---------- */
+  nav.side-nav{
+    display:none; position:fixed; left:0; top:0; width:var(--sidebar-w); height:100vh;
+    background:var(--navy); color:#fff; padding:26px 18px; z-index:60;
+    flex-direction:column;
+  }
+  nav.side-nav .brand{ display:flex; align-items:center; gap:10px; margin-bottom:34px; padding:0 4px; }
+  nav.side-nav .brand-mark{ width:30px; height:30px; border-radius:8px; background:var(--gold); flex-shrink:0; }
+  nav.side-nav .brand-name{ font-weight:600; font-size:16px; }
+  nav.side-nav .side-nav-links{ display:flex; flex-direction:column; gap:2px; }
+  nav.side-nav a{
+    display:flex; align-items:center; gap:12px; padding:11px 12px; border-radius:10px;
+    color:#B6BBCE; text-decoration:none; font-size:14px; font-weight:500; cursor:pointer;
+  }
+  nav.side-nav a svg{ width:17px; height:17px; opacity:.85; flex-shrink:0; }
+  nav.side-nav a.active{ background:var(--navy-mid); color:#fff; }
+  nav.side-nav a.active svg{ opacity:1; }
+
+  /* ---------- Desktop layout (≥960px) ---------- */
+  @media (min-width:960px){
+    body{ max-width:none; margin:0; padding-left:var(--sidebar-w); padding-bottom:0; }
+    nav.bottom-nav{ display:none; }
+    nav.side-nav{ display:flex; }
+    .toast{ bottom:26px; }
+
+    main{ max-width:1320px; margin:0 auto; padding:34px 40px 60px; }
+
+    header.app-header{
+      background:transparent; color:var(--ink); padding:0 0 20px; margin-bottom:20px;
+      border-bottom:1px solid var(--line);
+    }
+    header.app-header .eyebrow{ color:var(--ink-soft); }
+    header.app-header .page-title{ font-size:26px; }
+    /* saldo/projeção/entradas-saídas do header da Início viram a faixa de KPI abaixo — escondidos aqui pra não duplicar */
+    #view-home header.app-header .header-sub, #view-home header.app-header .big-value{ display:none; }
+
+    /* ---- Faixa de indicadores (KPI strip) ---- */
+    .kpi-strip{
+      display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:16px; grid-column:1/-1;
+    }
+    .kpi-strip.kpi-strip-3{ grid-template-columns:repeat(3,1fr); }
+    .kpi-tile{ border-radius:14px; padding:18px 20px; }
+    .kpi-tile .lbl{ font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
+    .kpi-tile .val{ font-family:'IBM Plex Mono',monospace; font-weight:500; font-size:22px; margin-top:8px; }
+    .kpi-tile .sub{ font-size:11.5px; margin-top:6px; font-weight:600; }
+    .kpi-tile.tone-navy{ background:var(--navy); color:#fff; }
+    .kpi-tile.tone-navy .lbl{ color:#B6BBCE; }
+    .kpi-tile.tone-navy .sub{ color:#9FD3B0; }
+    .kpi-tile.tone-green{ background:#EAF2EC; border:1px solid #D3E5D9; }
+    .kpi-tile.tone-green .lbl{ color:#5C8267; }
+    .kpi-tile.tone-green .val{ color:var(--ink); }
+    .kpi-tile.tone-green .sub{ color:var(--green); }
+    .kpi-tile.tone-gold{ background:var(--gold-soft); border:1px solid #E5D9BC; }
+    .kpi-tile.tone-gold .lbl{ color:#8C7A45; }
+    .kpi-tile.tone-gold .val{ color:var(--ink); }
+    .kpi-tile.tone-gold .sub{ color:#8C7A45; }
+    .kpi-tile.tone-terracota{ background:#F7ECE9; border:1px solid #EAD3CC; }
+    .kpi-tile.tone-terracota .lbl{ color:#96473D; }
+    .kpi-tile.tone-terracota .val{ color:var(--ink); }
+    .kpi-tile.tone-terracota .sub{ color:var(--terracota); }
+
+    /* ---- Início: grid denso de 4 colunas ---- */
+    #view-home main{
+      display:grid; grid-template-columns:repeat(4, 1fr); column-gap:14px; row-gap:16px; align-items:start;
+    }
+    #view-home .acoes-rapidas{ grid-column:1 / -1; margin-bottom:0; }
+    #view-home .db-block{ margin-bottom:0; margin-top:0 !important; }
+    #view-home .db-alerta{ grid-column:span 2; }
+    #view-home .db-ring{ grid-column:span 1; }
+    #view-home .db-vencimentos{ grid-column:span 1; }
+    #view-home .db-categoria{ grid-column:span 2; }
+    #view-home .db-comparativo{ grid-column:span 2; }
+    #view-home .db-quote{ grid-column:span 2; }
+    #view-home .db-distribuicao{ grid-column:span 2; }
+
+    /* ---- Cards com borda de destaque colorida (só no desktop) ---- */
+    #view-home .db-block .card{ border-left:4px solid var(--line); }
+    #view-home .db-alerta .card{ border-left-color:var(--green); }
+    #view-home .db-alerta.risco .card{ border-left-color:var(--terracota); }
+    #view-home .db-ring .card{ border-left-color:var(--green); }
+    #view-home .db-vencimentos > div{ background:var(--white); border:1px solid var(--line); border-left:4px solid var(--terracota); border-radius:12px; padding:4px 14px; }
+    #view-home .db-vencimentos .despesa-item{ border:none; border-radius:0; margin-bottom:0; padding:12px 0; border-bottom:1px solid var(--line); }
+    #view-home .db-vencimentos .despesa-item:last-child{ border-bottom:none; }
+    #view-home .db-categoria .card{ border-left-color:var(--terracota); }
+    #view-home .db-comparativo .card{ border-left-color:var(--navy); }
+    #view-home .db-distribuicao .card{ border-left-color:var(--gold); }
+
+    /* ---- Contas: KPI + contas em grid + receitas/despesas lado a lado ---- */
+    #view-contas header.app-header .header-sub, #view-contas header.app-header .big-value{ display:none; }
+    #lista-contas{ display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; }
+    #lista-contas .conta-card{ margin-bottom:0; border-left:4px solid var(--navy); }
+    .mov-cols{ display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start; }
+    #view-contas .despesa-item{ border-left:3px solid var(--terracota); }
+    #view-contas #lista-entradas .despesa-item{ border-left:3px solid var(--green); }
+    #view-contas #mes-projecao-card{ display:none; } /* os 4 números já estão na faixa de KPI */
+    #view-investimentos header.app-header .header-sub, #view-investimentos header.app-header .big-value{ display:none; }
+    #lista-investimentos .card{ border-left:4px solid var(--gold); }
+    #lista-cartoes{ display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; }
+    #lista-cartoes .conta-card{ margin-bottom:0; border-left:4px solid var(--gold); }
+    #cartoes-painel-fatura .mov-cols{ margin-bottom:16px; }
+  }
 </style>
 </head>
 <body>
@@ -191,6 +296,36 @@
 
 <div id="app-root" style="display:none">
 
+<!-- ===== SIDEBAR (desktop only, ≥960px) ===== -->
+<nav class="side-nav">
+  <div class="brand">
+    <div class="brand-mark"></div>
+    <div class="brand-name">AppFinanceiro</div>
+  </div>
+  <div class="side-nav-links">
+    <a data-view="home" class="active" onclick="mudarView('home')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 11L12 4l8 7"/><path d="M6 10v9h12v-9"/><path d="M10 19v-5h4v5"/></svg>
+      Início
+    </a>
+    <a data-view="contas" onclick="mudarView('contas')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18"/><circle cx="16.5" cy="14.3" r="1.6"/></svg>
+      Contas
+    </a>
+    <a data-view="investimentos" onclick="mudarView('investimentos')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19h3v-6H4v6zm6.5 0h3V9h-3v10zM17 19h3V5h-3v14z"/></svg>
+      Investimentos
+    </a>
+    <a data-view="cartoes" onclick="mudarView('cartoes')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5.5" width="18" height="13" rx="2.2"/><path d="M3 9.5h18"/><path d="M6.5 14.5h4"/></svg>
+      Cartões
+    </a>
+    <a onclick="fazerLogout()" style="margin-top:14px; border-top:1px solid var(--navy-mid); padding-top:14px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+      Sair
+    </a>
+  </div>
+</nav>
+
 <!-- ===== HOME ===== -->
 <section id="view-home" class="view active">
   <header class="app-header">
@@ -202,6 +337,29 @@
     <p class="header-sub" id="home-entradas-saidas">Entradas R$ 0,00 · Saídas R$ 0,00 previstas</p>
   </header>
   <main>
+    <div class="kpi-strip" id="kpi-strip">
+      <div class="kpi-tile tone-navy">
+        <div class="lbl">Saldo atual</div>
+        <div class="val" id="kpi-saldo">R$ 0,00</div>
+        <div class="sub">em todas as contas</div>
+      </div>
+      <div class="kpi-tile tone-green" id="kpi-projecao-tile">
+        <div class="lbl">Projeção fim do mês</div>
+        <div class="val" id="kpi-projecao">R$ 0,00</div>
+        <div class="sub" id="kpi-projecao-sub">—</div>
+      </div>
+      <div class="kpi-tile tone-gold">
+        <div class="lbl">Entradas previstas</div>
+        <div class="val" id="kpi-entradas">R$ 0,00</div>
+        <div class="sub">no mês</div>
+      </div>
+      <div class="kpi-tile tone-terracota">
+        <div class="lbl">Saídas previstas</div>
+        <div class="val" id="kpi-saidas">R$ 0,00</div>
+        <div class="sub" id="kpi-saidas-sub">no mês</div>
+      </div>
+    </div>
+
     <div class="acoes-rapidas">
       <button class="acao-btn" onclick="mudarView('contas'); setTimeout(abrirFormDespesa, 150)">
         <span class="acao-icone">+</span>Despesa
@@ -214,48 +372,62 @@
       </button>
     </div>
 
-    <div class="section-title">Como está o mês</div>
-    <div class="card alerta-card" id="home-alerta">
-      <div class="alerta-titulo" id="home-alerta-titulo">—</div>
-      <div class="muted" id="home-alerta-texto" style="margin-top:6px; line-height:1.5"></div>
-    </div>
-
-    <div class="section-title">Próximos vencimentos</div>
-    <div id="home-vencimentos"><p class="empty-hint">Nada por aqui ainda</p></div>
-
-    <div class="section-title">Para pensar</div>
-    <div class="quote-card" id="home-quote">—</div>
-
-    <div class="section-title">Contas pagas no mês</div>
-    <div class="card" style="display:flex; align-items:center; gap:18px">
-      <svg width="86" height="86" viewBox="0 0 86 86" style="flex-shrink:0">
-        <circle cx="43" cy="43" r="36" fill="none" stroke="var(--line)" stroke-width="9"/>
-        <circle id="home-ring" cx="43" cy="43" r="36" fill="none" stroke="var(--green)" stroke-width="9"
-          stroke-linecap="round" transform="rotate(-90 43 43)" stroke-dasharray="226" stroke-dashoffset="226"/>
-        <text id="home-ring-text" x="43" y="40" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="15" fill="var(--ink)">0/0</text>
-        <text x="43" y="55" text-anchor="middle" font-family="'Jost',sans-serif" font-size="8.5" fill="var(--ink-soft)">pagas</text>
-      </svg>
-      <div>
-        <div style="font-weight:600; font-size:14px" id="home-faltam-contas">Faltam 0 contas</div>
-        <div class="muted" style="margin-top:5px; line-height:1.5" id="home-falta-pagar">Nenhuma despesa cadastrada ainda</div>
+    <div class="db-block db-alerta">
+      <div class="section-title">Como está o mês</div>
+      <div class="card alerta-card" id="home-alerta">
+        <div class="alerta-titulo" id="home-alerta-titulo">—</div>
+        <div class="muted" id="home-alerta-texto" style="margin-top:6px; line-height:1.5"></div>
       </div>
     </div>
 
-    <div class="section-title">Onde foi seu dinheiro este mês</div>
-    <div class="card" id="home-categoria-card">
-      <div class="cat-bar" id="home-cat-bar"></div>
-      <div id="home-cat-legenda" style="margin-top:12px"></div>
+    <div class="db-block db-ring">
+      <div class="section-title">Contas pagas no mês</div>
+      <div class="card" style="display:flex; align-items:center; gap:18px">
+        <svg width="86" height="86" viewBox="0 0 86 86" style="flex-shrink:0">
+          <circle cx="43" cy="43" r="36" fill="none" stroke="var(--line)" stroke-width="9"/>
+          <circle id="home-ring" cx="43" cy="43" r="36" fill="none" stroke="var(--green)" stroke-width="9"
+            stroke-linecap="round" transform="rotate(-90 43 43)" stroke-dasharray="226" stroke-dashoffset="226"/>
+          <text id="home-ring-text" x="43" y="40" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="15" fill="var(--ink)">0/0</text>
+          <text x="43" y="55" text-anchor="middle" font-family="'Jost',sans-serif" font-size="8.5" fill="var(--ink-soft)">pagas</text>
+        </svg>
+        <div>
+          <div style="font-weight:600; font-size:14px" id="home-faltam-contas">Faltam 0 contas</div>
+          <div class="muted" style="margin-top:5px; line-height:1.5" id="home-falta-pagar">Nenhuma despesa cadastrada ainda</div>
+        </div>
+      </div>
     </div>
 
-    <div class="section-title">Comparado ao mês anterior</div>
-    <div class="card" id="home-comparativo">
-      <div class="alerta-titulo" id="home-comp-titulo" style="color:var(--ink)">—</div>
-      <div class="muted" style="margin-top:6px" id="home-comp-texto"></div>
+    <div class="db-block db-vencimentos">
+      <div class="section-title">Próximos vencimentos</div>
+      <div id="home-vencimentos"><p class="empty-hint">Nada por aqui ainda</p></div>
     </div>
 
-    <div class="section-title">Distribuição do mês</div>
-    <div class="muted" style="margin:-6px 2px 12px; font-size:11.5px">Meta: 70% Essencial · 20% Lazer · 10% Investimento</div>
-    <div id="home-distribuicao"></div>
+    <div class="db-block db-categoria">
+      <div class="section-title">Onde foi seu dinheiro este mês</div>
+      <div class="card" id="home-categoria-card">
+        <div class="cat-bar" id="home-cat-bar"></div>
+        <div id="home-cat-legenda" style="margin-top:12px"></div>
+      </div>
+    </div>
+
+    <div class="db-block db-comparativo">
+      <div class="section-title">Comparado ao mês anterior</div>
+      <div class="card" id="home-comparativo">
+        <div class="alerta-titulo" id="home-comp-titulo" style="color:var(--ink)">—</div>
+        <div class="muted" style="margin-top:6px" id="home-comp-texto"></div>
+      </div>
+    </div>
+
+    <div class="db-block db-quote">
+      <div class="section-title">Para pensar</div>
+      <div class="quote-card" id="home-quote">—</div>
+    </div>
+
+    <div class="db-block db-distribuicao">
+      <div class="section-title">Distribuição do mês</div>
+      <div class="muted" style="margin:-6px 2px 12px; font-size:11.5px">Meta: 70% Essencial · 20% Lazer · 10% Investimento</div>
+      <div id="home-distribuicao"></div>
+    </div>
   </main>
 </section>
 
@@ -268,6 +440,29 @@
     <p class="big-value" id="contas-disponivel-total">R$ 0,00</p>
   </header>
   <main>
+    <div class="kpi-strip">
+      <div class="kpi-tile tone-navy">
+        <div class="lbl">Saldo total</div>
+        <div class="val" id="kpi-contas-saldo">R$ 0,00</div>
+        <div class="sub">em todas as contas</div>
+      </div>
+      <div class="kpi-tile tone-green">
+        <div class="lbl">Receitas do mês</div>
+        <div class="val" id="kpi-contas-receitas">R$ 0,00</div>
+        <div class="sub">mês selecionado</div>
+      </div>
+      <div class="kpi-tile tone-terracota">
+        <div class="lbl">Despesas do mês</div>
+        <div class="val" id="kpi-contas-despesas">R$ 0,00</div>
+        <div class="sub">mês selecionado</div>
+      </div>
+      <div class="kpi-tile tone-gold" id="kpi-contas-saldo-tile">
+        <div class="lbl" id="kpi-contas-saldo-lbl">Previsão do mês</div>
+        <div class="val" id="kpi-contas-previsao">R$ 0,00</div>
+        <div class="sub">receitas − despesas</div>
+      </div>
+    </div>
+
     <div class="section-title">Cadastradas</div>
     <div id="lista-contas"><p class="empty-hint">Nenhuma conta cadastrada ainda</p></div>
     <button class="btn btn-outline" onclick="abrirFormConta()">+ &nbsp;Nova conta</button>
@@ -293,17 +488,23 @@
       </div>
     </div>
 
-    <div class="section-title row-between" style="align-items:center">
-      <span>Receitas</span>
-      <button class="btn-outline small" style="width:auto; padding:6px 14px; border-radius:99px" onclick="abrirFormEntrada()">+ Nova</button>
-    </div>
-    <div id="lista-entradas"><p class="empty-hint">Nenhuma receita neste mês</p></div>
+    <div class="mov-cols">
+      <div>
+        <div class="section-title row-between" style="align-items:center">
+          <span>Receitas</span>
+          <button class="btn-outline small" style="width:auto; padding:6px 14px; border-radius:99px" onclick="abrirFormEntrada()">+ Nova</button>
+        </div>
+        <div id="lista-entradas"><p class="empty-hint">Nenhuma receita neste mês</p></div>
+      </div>
 
-    <div class="section-title row-between" style="align-items:center; margin-top:22px">
-      <span>Despesas</span>
-      <button class="btn-outline small" style="width:auto; padding:6px 14px; border-radius:99px" onclick="abrirFormDespesa()">+ Nova</button>
+      <div>
+        <div class="section-title row-between" style="align-items:center">
+          <span>Despesas</span>
+          <button class="btn-outline small" style="width:auto; padding:6px 14px; border-radius:99px" onclick="abrirFormDespesa()">+ Nova</button>
+        </div>
+        <div id="lista-despesas"><p class="empty-hint">Nenhuma despesa neste mês</p></div>
+      </div>
     </div>
-    <div id="lista-despesas"><p class="empty-hint">Nenhuma despesa neste mês</p></div>
   </main>
 </section>
 
@@ -316,26 +517,61 @@
     <p class="big-value" id="invest-total">R$ 0,00</p>
   </header>
   <main>
-    <div class="section-title">Patrimônio (contas + investimentos)</div>
-    <div class="card">
-      <div class="value" style="font-size:20px" id="patrimonio-total">R$ 0,00</div>
-      <div class="cat-bar" id="patrimonio-tipo-bar" style="margin-top:12px"></div>
-      <div id="patrimonio-tipo-legenda" style="margin-top:12px"></div>
+    <div class="kpi-strip">
+      <div class="kpi-tile tone-navy">
+        <div class="lbl">Total investido</div>
+        <div class="val" id="kpi-inv-total">R$ 0,00</div>
+        <div class="sub">cotação atualizada</div>
+      </div>
+      <div class="kpi-tile tone-gold">
+        <div class="lbl">Patrimônio total</div>
+        <div class="val" id="kpi-inv-patrimonio">R$ 0,00</div>
+        <div class="sub">contas + investimentos</div>
+      </div>
+      <div class="kpi-tile tone-green" id="kpi-inv-melhor-tile">
+        <div class="lbl">Melhor retorno</div>
+        <div class="val" id="kpi-inv-melhor">—</div>
+        <div class="sub" id="kpi-inv-melhor-sub">—</div>
+      </div>
+      <div class="kpi-tile tone-gold" id="kpi-inv-alertas-tile">
+        <div class="lbl">Sugestões da carteira</div>
+        <div class="val" id="kpi-inv-alertas">0</div>
+        <div class="sub">sinalizações ativas</div>
+      </div>
     </div>
 
-    <div class="section-title">Por segmento</div>
-    <div class="card" id="invest-segmento-card">
-      <div class="cat-bar" id="invest-seg-bar"></div>
-      <div id="invest-seg-legenda" style="margin-top:12px"></div>
+    <div class="mov-cols">
+      <div>
+        <div class="section-title">Patrimônio (contas + investimentos)</div>
+        <div class="card">
+          <div class="value" style="font-size:20px" id="patrimonio-total">R$ 0,00</div>
+          <div class="cat-bar" id="patrimonio-tipo-bar" style="margin-top:12px"></div>
+          <div id="patrimonio-tipo-legenda" style="margin-top:12px"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-title">Por segmento</div>
+        <div class="card" id="invest-segmento-card">
+          <div class="cat-bar" id="invest-seg-bar"></div>
+          <div id="invest-seg-legenda" style="margin-top:12px"></div>
+        </div>
+      </div>
     </div>
 
-    <div class="section-title" style="margin-top:26px">Ranking de retorno</div>
-    <div id="invest-ranking"><p class="empty-hint">Cadastre ações, FIIs ou cripto pra ver o ranking</p></div>
+    <div class="mov-cols" style="margin-top:22px">
+      <div>
+        <div class="section-title">Ranking de retorno</div>
+        <div id="invest-ranking"><p class="empty-hint">Cadastre ações, FIIs ou cripto pra ver o ranking</p></div>
+      </div>
 
-    <div class="section-title">Sugestões da carteira</div>
-    <div id="invest-sugestoes"><p class="empty-hint">Sem sugestões por enquanto</p></div>
+      <div>
+        <div class="section-title">Sugestões da carteira</div>
+        <div id="invest-sugestoes"><p class="empty-hint">Sem sugestões por enquanto</p></div>
+      </div>
+    </div>
 
-    <div class="section-title row-between" style="align-items:center">
+    <div class="section-title row-between" style="align-items:center; margin-top:22px">
       <span>Posições cadastradas</span>
       <button class="btn-outline small" style="width:auto; padding:7px 12px; border-radius:99px" onclick="atualizarCotacoes()">🔄 Atualizar cotações</button>
     </div>
@@ -356,6 +592,24 @@
       <p class="big-value" id="cartoes-limite-total">R$ 0,00</p>
     </header>
     <main>
+      <div class="kpi-strip kpi-strip-3">
+        <div class="kpi-tile tone-navy">
+          <div class="lbl">Limite disponível total</div>
+          <div class="val" id="kpi-cart-limite">R$ 0,00</div>
+          <div class="sub">somando todos os cartões</div>
+        </div>
+        <div class="kpi-tile tone-terracota">
+          <div class="lbl">Faturas abertas (total)</div>
+          <div class="val" id="kpi-cart-faturas">R$ 0,00</div>
+          <div class="sub">acumulando este ciclo</div>
+        </div>
+        <div class="kpi-tile tone-gold">
+          <div class="lbl">Cartões cadastrados</div>
+          <div class="val" id="kpi-cart-qtd">0</div>
+          <div class="sub">ativos</div>
+        </div>
+      </div>
+
       <div class="section-title">Cadastrados</div>
       <div id="lista-cartoes"><p class="empty-hint">Nenhum cartão cadastrado ainda</p></div>
       <button class="btn btn-outline" onclick="abrirFormCartao()">+ &nbsp;Novo cartão</button>
@@ -390,14 +644,20 @@
       </div>
       <input type="file" id="input-extrato" accept=".csv,.xlsx,.xls" style="display:none" onchange="importarExtrato(event)">
 
-      <div class="section-title">Gasto por categoria</div>
-      <div class="card" id="fatura-categoria-card">
-        <div class="cat-bar" id="fatura-cat-bar"></div>
-        <div id="fatura-cat-legenda" style="margin-top:12px"></div>
-      </div>
+      <div class="mov-cols">
+        <div>
+          <div class="section-title">Gasto por categoria</div>
+          <div class="card" id="fatura-categoria-card">
+            <div class="cat-bar" id="fatura-cat-bar"></div>
+            <div id="fatura-cat-legenda" style="margin-top:12px"></div>
+          </div>
+        </div>
 
-      <div class="section-title">Compromisso de parcelas</div>
-      <div id="fatura-parcelas"><p class="empty-hint">Nenhuma parcela em aberto</p></div>
+        <div>
+          <div class="section-title">Compromisso de parcelas</div>
+          <div id="fatura-parcelas"><p class="empty-hint">Nenhuma parcela em aberto</p></div>
+        </div>
+      </div>
 
       <div class="section-title">Lançamentos</div>
       <div id="lista-lancamentos"><p class="empty-hint">Nenhum lançamento nesta fatura</p></div>
@@ -909,6 +1169,7 @@ window.mudarView = function(nome){
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-'+nome).classList.add('active');
   document.querySelectorAll('.bottom-nav button').forEach(b => b.classList.toggle('active', b.dataset.view === nome));
+  document.querySelectorAll('.side-nav a').forEach(a => a.classList.toggle('active', a.dataset.view === nome));
 };
 
 window.toggleSeg = function(btn){
@@ -1559,6 +1820,17 @@ function renderProjecaoMes(chave, doMes){
   const saldoEl = document.getElementById('mes-proj-saldo');
   saldoEl.textContent = brl(saldoAcumulado);
   saldoEl.style.color = saldoAcumulado >= 0 ? 'var(--green)' : 'var(--terracota)';
+
+  // --- Faixa de KPIs (desktop) ---
+  const saldoTotalContas = contas.reduce((s,c)=> s + (c.saldo||0), 0);
+  document.getElementById('kpi-contas-saldo').textContent = brl(saldoTotalContas);
+  document.getElementById('kpi-contas-receitas').textContent = brl(totalReceitasMes);
+  document.getElementById('kpi-contas-despesas').textContent = brl(totalDespesasMes);
+  document.getElementById('kpi-contas-previsao').textContent = brl(saldoAcumulado);
+  document.getElementById('kpi-contas-saldo-lbl').textContent = 'Previsão · ' + NOMES_MES[mesAtual.getMonth()].slice(0,3) + '/' + mesAtual.getFullYear();
+  const kpiContasTile = document.getElementById('kpi-contas-saldo-tile');
+  kpiContasTile.classList.remove('tone-gold','tone-green','tone-terracota');
+  kpiContasTile.classList.add(saldoAcumulado >= 0 ? 'tone-green' : 'tone-terracota');
 }
 
 window.abrirFaturaNoMes = function(cartaoId, chave){
@@ -1839,6 +2111,7 @@ function segmentoDe(inv){
 }
 
 const CORES_SEGMENTO = { 'Renda Fixa':'#6E9B7B', 'Renda Variável':'#B5645A', 'Cripto':'#B9A06B' };
+const CORES_TIPO_PATRIMONIO = { 'Contas correntes':'#5B7291', 'Investimentos':'#B9A06B' };
 let instituicoesExpandidas = new Set();
 
 window.toggleInstituicao = function(instituicao){
@@ -1899,6 +2172,7 @@ function renderInvestimentos(){
 
   const total = investimentos.reduce((s,inv)=> s + valorAtualInvestimento(inv), 0);
   document.getElementById('invest-total').textContent = brl(total);
+  document.getElementById('kpi-inv-total').textContent = brl(total);
 
   const porSegmento = {};
   investimentos.forEach(inv => {
@@ -1960,6 +2234,23 @@ function renderRankingESugestoes(){
     `).join('') + `</div>`;
   }
 
+  const kpiMelhorEl = document.getElementById('kpi-inv-melhor');
+  const kpiMelhorSubEl = document.getElementById('kpi-inv-melhor-sub');
+  const kpiMelhorTile = document.getElementById('kpi-inv-melhor-tile');
+  if (kpiMelhorEl){
+    if (comRetorno.length === 0){
+      kpiMelhorEl.textContent = '—';
+      kpiMelhorSubEl.textContent = 'sem ativos no ranking';
+      kpiMelhorTile.classList.remove('tone-terracota'); kpiMelhorTile.classList.add('tone-green');
+    } else {
+      const top = comRetorno[0];
+      kpiMelhorEl.textContent = `${top.variacao>=0?'↑':'↓'} ${Math.abs(top.variacao).toFixed(1)}%`;
+      kpiMelhorSubEl.textContent = top.inv.nomeAtivo;
+      kpiMelhorTile.classList.toggle('tone-green', top.variacao >= 0);
+      kpiMelhorTile.classList.toggle('tone-terracota', top.variacao < 0);
+    }
+  }
+
   // --- Sugestões heurísticas (não é recomendação financeira, só sinalização) ---
   const sugestoes = [];
   const totalCarteira = investimentos.reduce((s,inv)=> s + valorAtualInvestimento(inv), 0);
@@ -1994,6 +2285,14 @@ function renderRankingESugestoes(){
       </div>
     `).join('') + `<div class="hint muted" style="padding:4px 2px">Sinalização automática por regras simples — não é recomendação de investimento.</div>`;
   }
+
+  const kpiAlertasEl = document.getElementById('kpi-inv-alertas');
+  const kpiAlertasTile = document.getElementById('kpi-inv-alertas-tile');
+  if (kpiAlertasEl){
+    kpiAlertasEl.textContent = sugestoes.length;
+    kpiAlertasTile.classList.toggle('tone-gold', sugestoes.length > 0);
+    kpiAlertasTile.classList.toggle('tone-green', sugestoes.length === 0);
+  }
 }
 
 function renderPatrimonio(){
@@ -2005,6 +2304,8 @@ function renderPatrimonio(){
   const totalGeral = saldoContas + totalInvest;
 
   totalEl.textContent = brl(totalGeral);
+  const kpiPatrimonioEl = document.getElementById('kpi-inv-patrimonio');
+  if (kpiPatrimonioEl) kpiPatrimonioEl.textContent = brl(totalGeral);
 
   const partes = [['Contas correntes', saldoContas], ['Investimentos', totalInvest]].filter(([,v]) => v !== 0);
   const barEl = document.getElementById('patrimonio-tipo-bar');
@@ -2222,6 +2523,17 @@ function renderCartoes(){
     return s + Math.max(0, (c.limiteTotal||0) - totalFatura);
   }, 0);
   document.getElementById('cartoes-limite-total').textContent = brl(limiteTotalGeral);
+
+  const faturasAbertasTotal = cartoes.reduce((s,c)=> {
+    const chaveAberta = mesFaturaDe(hojeISO, c);
+    return s + totalFaturaDe(c.id, chaveAberta);
+  }, 0);
+  const kpiCartLimite = document.getElementById('kpi-cart-limite');
+  if (kpiCartLimite){
+    kpiCartLimite.textContent = brl(limiteTotalGeral);
+    document.getElementById('kpi-cart-faturas').textContent = brl(faturasAbertasTotal);
+    document.getElementById('kpi-cart-qtd').textContent = cartoes.length;
+  }
 }
 
 window.abrirFatura = function(cartaoId){
@@ -2481,17 +2793,37 @@ function renderHome(){
   document.getElementById('home-projecao').textContent = `Projeção fim do mês: ${brl(saldoProjetado)}`;
   document.getElementById('home-entradas-saidas').textContent = `Entradas ${brl(totalEntradasMesTodas)} · Saídas do mês ${brl(totalDespesasComFatura)}`;
 
+  // --- Faixa de KPIs (desktop) — mesmos números do cabeçalho, só que em cards separados ---
+  document.getElementById('kpi-saldo').textContent = brl(saldoContas);
+  document.getElementById('kpi-projecao').textContent = brl(saldoProjetado);
+  document.getElementById('kpi-entradas').textContent = brl(totalEntradasMesTodas);
+  document.getElementById('kpi-saidas').textContent = brl(totalDespesasComFatura);
+  const kpiProjTile = document.getElementById('kpi-projecao-tile');
+  const kpiProjSub = document.getElementById('kpi-projecao-sub');
+  if (saldoProjetado >= 0){
+    kpiProjTile.classList.remove('tone-terracota');
+    kpiProjTile.classList.add('tone-green');
+    kpiProjSub.textContent = '✓ tranquilo';
+  } else {
+    kpiProjTile.classList.remove('tone-green');
+    kpiProjTile.classList.add('tone-terracota');
+    kpiProjSub.textContent = '⚠ atenção';
+  }
+
   // --- Alerta de risco ---
   const alertaEl = document.getElementById('home-alerta');
+  const alertaBlocoEl = alertaEl.closest('.db-alerta');
   const limiteTotal = contas.reduce((s,c)=> s + (c.temLimite ? (c.limite||0) : 0), 0);
   if (saldoProjetado >= 0){
     alertaEl.classList.add('ok');
+    if (alertaBlocoEl) alertaBlocoEl.classList.remove('risco');
     document.getElementById('home-alerta-titulo').textContent = '✓ Tudo tranquilo';
     document.getElementById('home-alerta-titulo').style.color = '';
     document.getElementById('home-alerta-texto').textContent =
       `Nas contas atuais, você fecha o mês positivo em ${brl(saldoProjetado)} — sem precisar resgatar investimento.`;
   } else {
     alertaEl.classList.remove('ok');
+    if (alertaBlocoEl) alertaBlocoEl.classList.add('risco');
     document.getElementById('home-alerta-titulo').textContent = '⚠ Atenção ao fim do mês';
     document.getElementById('home-alerta-texto').textContent = Math.abs(saldoProjetado) <= limiteTotal
       ? `Você pode fechar negativo em ${brl(Math.abs(saldoProjetado))} — dentro do limite de cheque especial disponível.`
@@ -2560,11 +2892,13 @@ function renderHome(){
   if (totalAnterior === 0){
     compTituloEl.textContent = 'Ainda sem dados do mês anterior';
     compTextoEl.textContent = `Este mês: ${brl(totalSaidas)}`;
+    document.getElementById('kpi-saidas-sub').textContent = 'no mês';
   } else {
     const variacao = ((totalSaidas - totalAnterior)/totalAnterior)*100;
     const subiu = variacao >= 0;
     compTituloEl.innerHTML = `<span class="mono" style="color:${subiu?'var(--terracota)':'var(--green)'}">${subiu?'↑':'↓'} ${Math.abs(variacao).toFixed(1)}%</span> ${subiu?'a mais':'a menos'} em gastos`;
     compTextoEl.textContent = `Mês anterior: ${brl(totalAnterior)}  ·  Este mês: ${brl(totalSaidas)}`;
+    document.getElementById('kpi-saidas-sub').textContent = `${subiu?'↑':'↓'} ${Math.abs(variacao).toFixed(1)}% vs mês passado`;
   }
 
   renderDistribuicaoMes(chaveMesAtualReal, totalEntradasMesTodas);
