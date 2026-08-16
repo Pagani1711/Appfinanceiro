@@ -86,6 +86,16 @@
   .despesa-valor.variavel{ color:#5B7291; }
   .del-btn{ background:none; border:none; color:var(--ink-soft); font-size:15px; cursor:pointer; padding:4px; }
 
+  .toggle-pagas{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    background:none; border:none; width:100%; padding:10px 2px; cursor:pointer;
+    font-family:'Jost',sans-serif; color:var(--ink-soft); font-size:12px; font-weight:500;
+  }
+  .toggle-pagas .seta{ transition:transform .2s; }
+  .toggle-pagas.aberto .seta{ transform:rotate(180deg); }
+  .lista-pagas{ display:none; }
+  .lista-pagas.aberto{ display:block; }
+
   .month-switch{ display:flex; align-items:center; justify-content:center; gap:16px; margin:6px 0 4px; }
   .month-switch button{ background:none; border:none; font-size:18px; color:var(--ink-soft); cursor:pointer; padding:4px 10px;}
   .month-switch .label{ font-weight:600; font-size:14px; min-width:120px; text-align:center; }
@@ -289,7 +299,11 @@
         <input type="password" id="login-senha" required autocomplete="current-password">
       </div>
       <div class="muted" id="login-erro" style="color:var(--terracota); margin-bottom:16px; display:none"></div>
+      <div class="muted" id="login-sucesso" style="color:var(--green); margin-bottom:16px; display:none"></div>
       <button class="btn btn-primary" type="submit">Entrar</button>
+      <div style="text-align:center; margin-top:16px">
+        <a href="#" onclick="return recuperarSenha(event)" style="color:var(--gold); font-size:12.5px; font-weight:600; text-decoration:none">Esqueci minha senha</a>
+      </div>
     </form>
   </div>
 </div>
@@ -1135,7 +1149,7 @@ import {
   query, orderBy, where, getDocs, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import {
-  getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut
+  getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -1732,10 +1746,38 @@ function mesChave(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padS
 
 const NOMES_MES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
+let despesasPagasAberto = false;
+let entradasRecebidasAberto = false;
+
+window.toggleDespesasPagas = function(){
+  despesasPagasAberto = !despesasPagasAberto;
+  renderDespesas();
+};
+window.toggleEntradasRecebidas = function(){
+  entradasRecebidasAberto = !entradasRecebidasAberto;
+  renderEntradas();
+};
+
+function itemDespesaHtml(d){
+  return `
+      <div class="despesa-item ${d.pago ? 'paga' : ''}">
+        <div class="check ${d.pago ? 'on' : ''}" onclick="togglePago('${d.id}', ${d.pago}, '${d.contaId||''}', ${d.valor||0})">${d.pago ? '✓' : ''}</div>
+        <div class="despesa-info">
+          <div class="despesa-nome">${d.nome}</div>
+          <div class="despesa-sub">${d.categoria} · ${d.contaNome || 'sem conta'} · vence ${formatarData(d.vencimento)}${d.parcelaTotal>1 ? ' · '+d.parcelaAtual+'/'+d.parcelaTotal : ''}</div>
+        </div>
+        <div class="despesa-valor ${d.tipo === 'Fixa' ? 'fixa' : 'variavel'}">${brl(d.valor||0)}</div>
+        <button class="del-btn" onclick="abrirFormDespesa('${d.id}')">✏️</button>
+        <button class="del-btn" onclick="excluirDespesa('${d.id}')">✕</button>
+      </div>`;
+}
+
 function renderDespesas(){
   document.getElementById('mes-label').textContent = NOMES_MES[mesAtual.getMonth()] + '/' + mesAtual.getFullYear();
   const chave = mesChave(mesAtual);
   const doMes = despesas.filter(d => (d.vencimento||'').startsWith(chave)).sort((a,b)=> (a.vencimento||'').localeCompare(b.vencimento||''));
+  const pendentes = doMes.filter(d => !d.pago);
+  const pagas = doMes.filter(d => d.pago);
 
   const el = document.getElementById('lista-despesas');
   let html = '';
@@ -1755,23 +1797,24 @@ function renderDespesas(){
     }
   });
 
-  if (doMes.length === 0 && html === ''){
-    el.innerHTML = '<p class="empty-hint">Nenhuma despesa neste mês</p>';
+  if (pendentes.length === 0 && html === ''){
+    html += '<p class="empty-hint">Nenhuma despesa pendente neste mês</p>';
   } else {
-    html += doMes.map(d => `
-      <div class="despesa-item ${d.pago ? 'paga' : ''}">
-        <div class="check ${d.pago ? 'on' : ''}" onclick="togglePago('${d.id}', ${d.pago}, '${d.contaId||''}', ${d.valor||0})">${d.pago ? '✓' : ''}</div>
-        <div class="despesa-info">
-          <div class="despesa-nome">${d.nome}</div>
-          <div class="despesa-sub">${d.categoria} · ${d.contaNome || 'sem conta'} · vence ${formatarData(d.vencimento)}${d.parcelaTotal>1 ? ' · '+d.parcelaAtual+'/'+d.parcelaTotal : ''}</div>
-        </div>
-        <div class="despesa-valor ${d.tipo === 'Fixa' ? 'fixa' : 'variavel'}">${brl(d.valor||0)}</div>
-        <button class="del-btn" onclick="abrirFormDespesa('${d.id}')">✏️</button>
-        <button class="del-btn" onclick="excluirDespesa('${d.id}')">✕</button>
-      </div>
-    `).join('');
-    el.innerHTML = html;
+    html += pendentes.map(itemDespesaHtml).join('');
   }
+
+  if (pagas.length > 0){
+    html += `
+    <button class="toggle-pagas ${despesasPagasAberto ? 'aberto' : ''}" onclick="toggleDespesasPagas()">
+      <span>Pagas este mês (${pagas.length}) · ${brl(pagas.reduce((s,d)=>s+(d.valor||0),0))}</span>
+      <span class="seta">▾</span>
+    </button>
+    <div class="lista-pagas ${despesasPagasAberto ? 'aberto' : ''}">
+      ${pagas.map(itemDespesaHtml).join('')}
+    </div>`;
+  }
+
+  el.innerHTML = html;
 
   renderEntradas();
   renderProjecaoMes(chave, doMes);
@@ -1839,15 +1882,8 @@ window.abrirFaturaNoMes = function(cartaoId, chave){
   setTimeout(()=> abrirFatura(cartaoId), 50);
 };
 
-function renderEntradas(){
-  const elEntradas = document.getElementById('lista-entradas');
-  if (!elEntradas) return;
-  const chave = mesChave(mesAtual);
-  const doMes = entradas.filter(en => (en.data||'').startsWith(chave)).sort((a,b)=> (a.data||'').localeCompare(b.data||''));
-  if (doMes.length === 0){
-    elEntradas.innerHTML = '<p class="empty-hint">Nenhuma receita neste mês</p>';
-  } else {
-    elEntradas.innerHTML = doMes.map(en => `
+function itemEntradaHtml(en){
+  return `
       <div class="despesa-item ${en.recebido ? 'paga' : ''}">
         <div class="check ${en.recebido ? 'on' : ''}" onclick="toggleRecebido('${en.id}', ${en.recebido}, '${en.contaId||''}', ${en.valor||0})">${en.recebido ? '✓' : ''}</div>
         <div class="despesa-info">
@@ -1857,9 +1893,36 @@ function renderEntradas(){
         <div class="despesa-valor" style="color:var(--green)">+${brl(en.valor||0)}</div>
         <button class="del-btn" onclick="abrirFormEntrada('${en.id}')">✏️</button>
         <button class="del-btn" onclick="excluirEntrada('${en.id}')">✕</button>
-      </div>
-    `).join('');
+      </div>`;
+}
+
+function renderEntradas(){
+  const elEntradas = document.getElementById('lista-entradas');
+  if (!elEntradas) return;
+  const chave = mesChave(mesAtual);
+  const doMes = entradas.filter(en => (en.data||'').startsWith(chave)).sort((a,b)=> (a.data||'').localeCompare(b.data||''));
+  const pendentes = doMes.filter(en => !en.recebido);
+  const recebidas = doMes.filter(en => en.recebido);
+
+  let html = '';
+  if (pendentes.length === 0){
+    html += '<p class="empty-hint">Nenhuma receita pendente neste mês</p>';
+  } else {
+    html += pendentes.map(itemEntradaHtml).join('');
   }
+
+  if (recebidas.length > 0){
+    html += `
+    <button class="toggle-pagas ${entradasRecebidasAberto ? 'aberto' : ''}" onclick="toggleEntradasRecebidas()">
+      <span>Recebidas este mês (${recebidas.length}) · ${brl(recebidas.reduce((s,en)=>s+(en.valor||0),0))}</span>
+      <span class="seta">▾</span>
+    </button>
+    <div class="lista-pagas ${entradasRecebidasAberto ? 'aberto' : ''}">
+      ${recebidas.map(itemEntradaHtml).join('')}
+    </div>`;
+  }
+
+  elEntradas.innerHTML = html;
 }
 
 function formatarData(iso){
@@ -2987,6 +3050,30 @@ window.fazerLogin = async function(e){
 window.fazerLogout = async function(){
   if (!confirm('Sair da sua conta?')) return;
   await signOut(auth);
+};
+
+window.recuperarSenha = async function(e){
+  if (e) e.preventDefault();
+  const erroEl = document.getElementById('login-erro');
+  const sucessoEl = document.getElementById('login-sucesso');
+  erroEl.style.display = 'none';
+  sucessoEl.style.display = 'none';
+  const email = document.getElementById('login-email').value.trim();
+  if (!email){
+    erroEl.textContent = 'Digite seu e-mail no campo acima primeiro.';
+    erroEl.style.display = '';
+    return false;
+  }
+  try{
+    await sendPasswordResetEmail(auth, email);
+    sucessoEl.textContent = `Link de redefinição enviado para ${email}. Confira sua caixa de entrada (e spam).`;
+    sucessoEl.style.display = '';
+  }catch(err){
+    console.error(err);
+    erroEl.textContent = 'Não foi possível enviar o link. Confira se o e-mail está correto.';
+    erroEl.style.display = '';
+  }
+  return false;
 };
 
 function pararListeners(){
