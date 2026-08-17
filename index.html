@@ -2315,6 +2315,19 @@ function renderInvestimentos(){
 }
 
 // ---------- Ranking de retorno e sugestões da carteira ----------
+let rankingExpandido = false;
+let sugestoesExpandido = false;
+const LIMITE_LISTA_INVEST = 5;
+
+window.toggleRankingExpandido = function(){
+  rankingExpandido = !rankingExpandido;
+  renderRankingESugestoes();
+};
+window.toggleSugestoesExpandido = function(){
+  sugestoesExpandido = !sugestoesExpandido;
+  renderRankingESugestoes();
+};
+
 function renderRankingESugestoes(){
   const rankingEl = document.getElementById('invest-ranking');
   const sugestoesEl = document.getElementById('invest-sugestoes');
@@ -2334,7 +2347,9 @@ function renderRankingESugestoes(){
   if (comRetorno.length === 0){
     rankingEl.innerHTML = '<p class="empty-hint">Cadastre ações, FIIs ou cripto pra ver o ranking</p>';
   } else {
-    rankingEl.innerHTML = `<div class="card">` + comRetorno.map((r,i) => `
+    const itensRanking = rankingExpandido ? comRetorno : comRetorno.slice(0, LIMITE_LISTA_INVEST);
+    const restoRanking = comRetorno.length - itensRanking.length;
+    rankingEl.innerHTML = `<div class="card">` + itensRanking.map((r,i) => `
       <div class="row-between" style="padding:8px 0; ${i>0 ? 'border-top:1px solid var(--line)' : ''}">
         <div>
           <div style="font-weight:500; font-size:13.5px">${i+1}º · ${r.inv.nomeAtivo}${r.inv.ticker ? ' ('+r.inv.ticker+')' : r.inv.simbolo ? ' ('+r.inv.simbolo+')' : ''}</div>
@@ -2342,7 +2357,13 @@ function renderRankingESugestoes(){
         </div>
         <div class="mono" style="color:${r.variacao>=0?'var(--green)':'var(--terracota)'}; font-size:13.5px">${r.variacao>=0?'↑':'↓'} ${Math.abs(r.variacao).toFixed(1)}%</div>
       </div>
-    `).join('') + `</div>`;
+    `).join('') + `</div>` +
+    (comRetorno.length > LIMITE_LISTA_INVEST ? `
+      <button class="toggle-pagas" style="justify-content:center; gap:6px" onclick="toggleRankingExpandido()">
+        <span>${rankingExpandido ? 'Ver menos' : `Ver mais ${restoRanking}`}</span>
+        <span class="seta" style="${rankingExpandido ? 'transform:rotate(180deg)' : ''}">▾</span>
+      </button>
+    ` : '');
   }
 
   const kpiMelhorEl = document.getElementById('kpi-inv-melhor');
@@ -2390,11 +2411,20 @@ function renderRankingESugestoes(){
   if (sugestoes.length === 0){
     sugestoesEl.innerHTML = '<p class="empty-hint">Nenhum alerta no momento — carteira parece equilibrada</p>';
   } else {
-    sugestoesEl.innerHTML = sugestoes.map(s => `
+    const itensSugestoes = sugestoesExpandido ? sugestoes : sugestoes.slice(0, LIMITE_LISTA_INVEST);
+    const restoSugestoes = sugestoes.length - itensSugestoes.length;
+    sugestoesEl.innerHTML = itensSugestoes.map(s => `
       <div class="card" style="border-color:${s.tipo==='alta'?'var(--green)':'var(--gold)'}">
         <div class="muted" style="line-height:1.5">${s.texto}</div>
       </div>
-    `).join('') + `<div class="hint muted" style="padding:4px 2px">Sinalização automática por regras simples — não é recomendação de investimento.</div>`;
+    `).join('') +
+    (sugestoes.length > LIMITE_LISTA_INVEST ? `
+      <button class="toggle-pagas" style="justify-content:center; gap:6px" onclick="toggleSugestoesExpandido()">
+        <span>${sugestoesExpandido ? 'Ver menos' : `Ver mais ${restoSugestoes}`}</span>
+        <span class="seta" style="${sugestoesExpandido ? 'transform:rotate(180deg)' : ''}">▾</span>
+      </button>
+    ` : '') +
+    `<div class="hint muted" style="padding:4px 2px">Sinalização automática por regras simples — não é recomendação de investimento.</div>`;
   }
 
   const kpiAlertasEl = document.getElementById('kpi-inv-alertas');
