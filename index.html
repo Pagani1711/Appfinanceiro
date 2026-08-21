@@ -2548,7 +2548,9 @@ window.excluirCartao = async function(id){
   toast('Cartão excluído');
 };
 
-// Determina em qual mês de VENCIMENTO (YYYY-MM) uma compra cai, dado o dia de fechamento do cartão
+// Determina em qual mês de VENCIMENTO (YYYY-MM) uma compra cai, dado o dia de fechamento e vencimento do cartão.
+// Funciona tanto pra cartões onde o vencimento cai no mês seguinte ao fechamento (ex: fecha dia 25, vence dia 5)
+// quanto pra cartões onde o vencimento cai no MESMO mês do fechamento (ex: fecha dia 4, vence dia 11).
 // Descobre qual "dia de fechamento" valia numa determinada data, usando o histórico do cartão
 function diaFechamentoEm(cart, dataISO){
   const hist = (cart.historicoFechamento && cart.historicoFechamento.length)
@@ -2560,11 +2562,15 @@ function diaFechamentoEm(cart, dataISO){
 
 function mesFaturaDe(dataCompraISO, cart){
   const diaFechamento = diaFechamentoEm(cart, dataCompraISO);
+  const diaVencimento = cart.diaVencimento || 10;
   const d = new Date(dataCompraISO + 'T00:00:00');
   let mes = d.getMonth(); // 0-indexed
   let ano = d.getFullYear();
-  const offset = d.getDate() > diaFechamento ? 2 : 1;
-  mes += offset;
+  // 1) mês de FECHAMENTO a que a compra pertence: se comprou depois do dia de fechamento, cai no ciclo do mês seguinte
+  if (d.getDate() > diaFechamento) mes += 1;
+  // 2) mês de VENCIMENTO: se o dia de vencimento é menor ou igual ao dia de fechamento, o vencimento cai no mês
+  //    seguinte ao do fechamento (padrão mais comum). Se o vencimento é depois do fechamento, cai no mesmo mês.
+  if (diaVencimento <= diaFechamento) mes += 1;
   while (mes > 11){ mes -= 12; ano += 1; }
   return `${ano}-${String(mes+1).padStart(2,'0')}`;
 }
