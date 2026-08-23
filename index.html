@@ -157,16 +157,57 @@
   }
   .acao-icone{ font-size:17px; font-weight:600; color:var(--navy); }
 
-  .alerta-card{ border-color:var(--terracota); background:#F6ECEA; }
-  .alerta-card.ok{ border-color:var(--green); background:#EEF3EE; }
   .alerta-titulo{ font-weight:600; font-size:13.5px; color:var(--terracota); }
-  .alerta-card.ok .alerta-titulo{ color:var(--green); }
 
   .quote-card{
     background:var(--navy); color:#fff; border-radius:14px; padding:18px 18px 16px;
     font-size:13.5px; line-height:1.55; margin-bottom:4px;
   }
   .quote-card .fonte{ font-size:10px; color:#B6BBCE; margin-top:10px; display:block; }
+
+  /* ---------- Projeção Financeira & Fluxo de Caixa ---------- */
+  .proj-periodo-switch{ display:flex; gap:8px; margin-bottom:14px; }
+  .proj-periodo-switch button{
+    flex:1; padding:9px; border-radius:10px; border:1px solid var(--line); background:#fff;
+    font-family:'Jost',sans-serif; font-size:12.5px; font-weight:600; color:var(--ink-soft); cursor:pointer;
+  }
+  .proj-periodo-switch button.active{ background:var(--navy); color:#fff; border-color:var(--navy); }
+
+  .proj-kpis{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
+  .proj-kpi-tile{ border-radius:14px; padding:14px 16px; }
+  .proj-kpi-tile .lbl{ font-size:9.5px; text-transform:uppercase; letter-spacing:.05em; }
+  .proj-kpi-tile .val{ font-family:'IBM Plex Mono',monospace; font-weight:500; font-size:16px; margin-top:6px; line-height:1.2; }
+  .proj-kpi-tile .sub{ font-size:10.5px; margin-top:5px; font-weight:600; }
+  .proj-kpi-tile.tone-navy{ background:var(--navy); color:#fff; }
+  .proj-kpi-tile.tone-navy .lbl{ color:#B6BBCE; }
+  .proj-kpi-tile.tone-navy .sub{ color:#9FD3B0; font-weight:400; }
+  .proj-kpi-tile.tone-green{ background:#EAF2EC; border:1px solid #D3E5D9; }
+  .proj-kpi-tile.tone-green .lbl{ color:#5C8267; }
+  .proj-kpi-tile.tone-green .val{ color:var(--ink); }
+  .proj-kpi-tile.tone-green .sub{ color:var(--green); }
+  .proj-kpi-tile.tone-gold{ background:var(--gold-soft); border:1px solid #E5D9BC; }
+  .proj-kpi-tile.tone-gold .lbl{ color:#8C7A45; }
+  .proj-kpi-tile.tone-gold .val{ color:var(--ink); }
+  .proj-kpi-tile.tone-gold .sub{ color:#8C7A45; }
+  .proj-kpi-tile.tone-terracota{ background:#F7ECE9; border:1px solid #EAD3CC; }
+  .proj-kpi-tile.tone-terracota .lbl{ color:#96473D; }
+  .proj-kpi-tile.tone-terracota .val{ color:var(--ink); }
+  .proj-kpi-tile.tone-terracota .sub{ color:var(--terracota); }
+
+  .proj-meses-cards{ display:grid; grid-template-columns:1fr; gap:12px; }
+  .proj-mes-card{ position:relative; }
+  .proj-mes-card.atual{ border-color:var(--navy); border-width:1.5px; }
+  .proj-badge-atual{
+    background:var(--navy); color:#fff; font-size:9.5px; font-weight:600; letter-spacing:.04em;
+    padding:3px 9px; border-radius:99px; text-transform:uppercase;
+  }
+  .proj-sublinha{ padding-left:10px; display:flex; flex-direction:column; gap:4px; margin-top:2px; }
+  .proj-sublinha .row-between{ font-size:10.8px; }
+
+  @media (min-width:960px){
+    .proj-kpis{ grid-template-columns:repeat(4,1fr); }
+    .proj-meses-cards{ grid-template-columns:repeat(3,1fr); }
+  }
 
   .cat-bar{ height:9px; border-radius:99px; overflow:hidden; display:flex; background:var(--line); }
   .cat-legenda-item{ display:flex; align-items:center; font-size:12px; padding:4px 0; }
@@ -250,7 +291,7 @@
     }
     #view-home .acoes-rapidas{ grid-column:1 / -1; margin-bottom:0; }
     #view-home .db-block{ margin-bottom:0; margin-top:0 !important; }
-    #view-home .db-alerta{ grid-column:span 2; }
+    #view-home .db-projecao{ grid-column:1 / -1; }
     #view-home .db-ring{ grid-column:span 1; }
     #view-home .db-vencimentos{ grid-column:span 1; }
     #view-home .db-categoria{ grid-column:span 2; }
@@ -260,8 +301,6 @@
 
     /* ---- Cards com borda de destaque colorida (só no desktop) ---- */
     #view-home .db-block .card{ border-left:4px solid var(--line); }
-    #view-home .db-alerta .card{ border-left-color:var(--green); }
-    #view-home .db-alerta.risco .card{ border-left-color:var(--terracota); }
     #view-home .db-ring .card{ border-left-color:var(--green); }
     #view-home .db-vencimentos > div{ background:var(--white); border:1px solid var(--line); border-left:4px solid var(--terracota); border-radius:12px; padding:4px 14px; }
     #view-home .db-vencimentos .despesa-item{ border:none; border-radius:0; margin-bottom:0; padding:12px 0; border-bottom:1px solid var(--line); }
@@ -393,12 +432,19 @@
       </button>
     </div>
 
-    <div class="db-block db-alerta">
-      <div class="section-title">Como está o mês</div>
-      <div class="card alerta-card" id="home-alerta">
-        <div class="alerta-titulo" id="home-alerta-titulo">—</div>
-        <div class="muted" id="home-alerta-texto" style="margin-top:6px; line-height:1.5"></div>
+    <div class="db-block db-projecao">
+      <div class="section-title">📅 Projeção Financeira &amp; Fluxo de Caixa</div>
+      <div class="muted" style="margin:-6px 2px 12px; font-size:11.5px">Análise do mês atual e simulação dos meses futuros com evolução de entradas, saídas e quitação de parcelas.</div>
+
+      <div class="proj-periodo-switch">
+        <button class="active" data-meses="3" onclick="mudarPeriodoProjecao(3)">3 Meses</button>
+        <button data-meses="6" onclick="mudarPeriodoProjecao(6)">6 Meses</button>
+        <button data-meses="12" onclick="mudarPeriodoProjecao(12)">12 Meses</button>
       </div>
+
+      <div class="proj-kpis" id="proj-kpis"></div>
+
+      <div class="proj-meses-cards" id="proj-meses-cards"></div>
     </div>
 
     <div class="db-block db-ring">
@@ -1187,6 +1233,7 @@ let lancamentosCartao = [];
 let mesAtual = new Date(); // mês sendo visualizado na aba Contas
 let cartaoAbertoId = null;
 let mesFatura = new Date(); // mês de vencimento da fatura sendo visualizada
+let periodoProjecaoMeses = 3; // período selecionado no card de Projeção Financeira & Fluxo de Caixa (Início)
 
 // ---------- Navegação ----------
 window.mudarView = function(nome){
@@ -2920,6 +2967,121 @@ const CATEGORIA_GRUPO = {
 };
 const METAS_DISTRIBUICAO = { Essencial:70, Lazer:20, Investimento:10 };
 
+// ---------- Projeção Financeira & Fluxo de Caixa (Início) ----------
+window.mudarPeriodoProjecao = function(meses){
+  periodoProjecaoMeses = meses;
+  document.querySelectorAll('.proj-periodo-switch button').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.meses) === meses);
+  });
+  renderProjecaoFluxoCaixa();
+};
+
+// Calcula entradas/saídas previstas (totais, independente de já ter sido paga/recebida) de um mês específico,
+// separando despesas em "fixas/avulsas" vs "parcelas de dívida" — pra alimentar os cards de projeção
+function calcularMesFluxoCaixa(dataMes){
+  const chave = mesChave(dataMes);
+  const entradasMes = entradas.filter(en => (en.data||'').startsWith(chave)).reduce((s,en)=> s+(en.valor||0), 0);
+
+  const despesasDoMes = despesas.filter(d => (d.vencimento||'').startsWith(chave));
+  const parceladas = despesasDoMes.filter(d => d.finita);
+  const naoParceladas = despesasDoMes.filter(d => !d.finita);
+  const somaFixas = naoParceladas.reduce((s,d)=> s+(d.valor||0), 0);
+  const somaParcelas = parceladas.reduce((s,d)=> s+(d.valor||0), 0);
+  const qtdParcelas = parceladas.length;
+
+  const faturaCartao = cartoes.reduce((s,c)=> s + totalFaturaDe(c.id, chave), 0);
+  const saidasTotais = somaFixas + somaParcelas + faturaCartao;
+
+  return {
+    dataMes, chave, entradasMes, somaFixas, somaParcelas, qtdParcelas, faturaCartao,
+    saidasTotais, saldoMes: entradasMes - saidasTotais
+  };
+}
+
+function renderProjecaoFluxoCaixa(){
+  const kpisEl = document.getElementById('proj-kpis');
+  const cardsEl = document.getElementById('proj-meses-cards');
+  if (!kpisEl || !cardsEl) return; // view ainda não montada
+
+  const hoje = new Date();
+  const meses = [];
+  for (let i = 0; i < periodoProjecaoMeses; i++){
+    meses.push(calcularMesFluxoCaixa(new Date(hoje.getFullYear(), hoje.getMonth()+i, 1)));
+  }
+
+  const saldoContasAtual = contas.reduce((s,c)=> s + (c.saldo||0), 0);
+  let cumulativo = saldoContasAtual;
+  meses.forEach(m => { cumulativo += m.saldoMes; m.caixaAcumulado = cumulativo; });
+
+  const acumuloLiquido = meses.reduce((s,m)=> s + m.saldoMes, 0);
+  const somaEntradasPeriodo = meses.reduce((s,m)=> s + m.entradasMes, 0);
+  const sobraMedia = acumuloLiquido / periodoProjecaoMeses;
+  const taxaPoupanca = somaEntradasPeriodo > 0 ? (acumuloLiquido / somaEntradasPeriodo * 100) : 0;
+  const saldoCaixaFinal = saldoContasAtual + acumuloLiquido;
+  const mesAtualFluxo = meses[0];
+  const mesFinalNome = NOMES_MES[meses[meses.length-1].dataMes.getMonth()].slice(0,3) + '/' + String(meses[meses.length-1].dataMes.getFullYear()).slice(2);
+
+  // --- KPIs ---
+  kpisEl.innerHTML = `
+    <div class="proj-kpi-tile tone-navy">
+      <div class="lbl">Mês atual (${NOMES_MES[hoje.getMonth()].slice(0,3)}/${String(hoje.getFullYear()).slice(2)})</div>
+      <div class="val">${brl(mesAtualFluxo.saldoMes)}</div>
+      <div class="sub">+${brl(mesAtualFluxo.entradasMes)}  -${brl(mesAtualFluxo.saidasTotais)}</div>
+    </div>
+    <div class="proj-kpi-tile tone-green">
+      <div class="lbl">Sobra média mensal projetada</div>
+      <div class="val">${brl(sobraMedia)}<span style="font-size:11px; font-weight:400">/mês</span></div>
+      <div class="sub">Taxa de poupança média: ${taxaPoupanca.toFixed(0)}%</div>
+    </div>
+    <div class="proj-kpi-tile tone-gold">
+      <div class="lbl">Acúmulo líquido (${periodoProjecaoMeses} meses)</div>
+      <div class="val">${acumuloLiquido>=0?'+':''}${brl(acumuloLiquido)}</div>
+      <div class="sub">Entradas: +${brl(somaEntradasPeriodo)}</div>
+    </div>
+    <div class="proj-kpi-tile ${saldoCaixaFinal>=0?'tone-green':'tone-terracota'}">
+      <div class="lbl">Saldo de caixa em ${mesFinalNome}</div>
+      <div class="val">${brl(saldoCaixaFinal)}</div>
+      <div class="sub">Disponível hoje: ${brl(saldoContasAtual)}</div>
+    </div>
+  `;
+
+  // --- Cards por mês ---
+  cardsEl.innerHTML = meses.map((m,i) => {
+    const nomeMesCompleto = NOMES_MES[m.dataMes.getMonth()];
+    const abrevMes = nomeMesCompleto.slice(0,3);
+    const ano = m.dataMes.getFullYear();
+    return `
+    <div class="card proj-mes-card ${i===0 ? 'atual' : ''}">
+      <div class="row-between" style="align-items:flex-start">
+        <div>
+          <div class="muted" style="text-transform:uppercase; font-size:10px; letter-spacing:.05em">${nomeMesCompleto} de ${ano}</div>
+          <div style="font-weight:600; font-size:16px; margin-top:2px">${abrevMes}/${String(ano).slice(2)}</div>
+        </div>
+        ${i===0 ? '<span class="proj-badge-atual">Mês atual</span>' : ''}
+      </div>
+      <div style="margin-top:14px; display:flex; flex-direction:column; gap:7px">
+        <div class="row-between"><span class="muted">Entradas Previstas:</span><span class="mono" style="color:var(--green); font-size:13px">+${brl(m.entradasMes)}</span></div>
+        <div class="row-between"><span class="muted" style="color:var(--terracota)">Saídas Totais:</span><span class="mono" style="color:var(--terracota); font-size:13px">-${brl(m.saidasTotais)}</span></div>
+        <div class="proj-sublinha">
+          <div class="row-between"><span class="muted">• Despesas Fixas:</span><span class="mono">${brl(m.somaFixas)}</span></div>
+          <div class="row-between"><span class="muted">• Parcelas Dívidas (${m.qtdParcelas}):</span><span class="mono">${brl(m.somaParcelas)}</span></div>
+          ${m.faturaCartao > 0 ? `<div class="row-between"><span class="muted">• Fatura Cartão:</span><span class="mono">${brl(m.faturaCartao)}</span></div>` : ''}
+        </div>
+      </div>
+      <div style="margin-top:12px; padding-top:12px; border-top:1px dashed var(--line)">
+        <div class="row-between">
+          <span style="font-weight:500; font-size:13px">Saldo no Mês:</span>
+          <span class="value" style="color:${m.saldoMes>=0?'var(--green)':'var(--terracota)'}">${m.saldoMes>=0?'+':''}${brl(m.saldoMes)}</span>
+        </div>
+        <div class="row-between" style="margin-top:6px">
+          <span class="muted">Caixa Acumulado:</span>
+          <span class="mono" style="font-weight:500">${brl(m.caixaAcumulado)}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 function renderHome(){
   const hoje = new Date();
   document.getElementById('home-date').textContent = hoje.toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long' }).toUpperCase();
@@ -2957,25 +3119,8 @@ function renderHome(){
     kpiProjSub.textContent = '⚠ atenção';
   }
 
-  // --- Alerta de risco ---
-  const alertaEl = document.getElementById('home-alerta');
-  const alertaBlocoEl = alertaEl.closest('.db-alerta');
-  const limiteTotal = contas.reduce((s,c)=> s + (c.temLimite ? (c.limite||0) : 0), 0);
-  if (saldoProjetado >= 0){
-    alertaEl.classList.add('ok');
-    if (alertaBlocoEl) alertaBlocoEl.classList.remove('risco');
-    document.getElementById('home-alerta-titulo').textContent = '✓ Tudo tranquilo';
-    document.getElementById('home-alerta-titulo').style.color = '';
-    document.getElementById('home-alerta-texto').textContent =
-      `Nas contas atuais, você fecha o mês positivo em ${brl(saldoProjetado)} — sem precisar resgatar investimento.`;
-  } else {
-    alertaEl.classList.remove('ok');
-    if (alertaBlocoEl) alertaBlocoEl.classList.add('risco');
-    document.getElementById('home-alerta-titulo').textContent = '⚠ Atenção ao fim do mês';
-    document.getElementById('home-alerta-texto').textContent = Math.abs(saldoProjetado) <= limiteTotal
-      ? `Você pode fechar negativo em ${brl(Math.abs(saldoProjetado))} — dentro do limite de cheque especial disponível.`
-      : `Você pode fechar negativo em ${brl(Math.abs(saldoProjetado))} — considere resgatar algum investimento pra cobrir a diferença.`;
-  }
+  // --- Projeção Financeira & Fluxo de Caixa (Início) ---
+  renderProjecaoFluxoCaixa();
 
   // --- Próximos vencimentos ---
   const proximas = doMesReal.filter(d=>!d.pago).sort((a,b)=>(a.vencimento||'').localeCompare(b.vencimento||'')).slice(0,4);
