@@ -774,6 +774,35 @@
   </div>
 </div>
 
+<!-- ===== DIÁLOGO: EXCLUIR ITEM DE SÉRIE RECORRENTE ===== -->
+<div class="overlay" id="overlay-excluir-serie">
+  <div class="sheet">
+    <div class="sheet-header">
+      <button onclick="cancelarExclusaoSerie()">←</button>
+      <h2>O que você quer excluir?</h2>
+    </div>
+    <div style="padding:20px">
+      <div class="muted" id="excluir-serie-desc" style="line-height:1.5; margin-bottom:18px">
+        Esse lançamento faz parte de uma série fixa (se repete todo mês).
+      </div>
+      <div style="display:flex; flex-direction:column; gap:10px">
+        <button class="btn btn-outline" style="text-align:left; padding:14px 16px" onclick="confirmarExclusaoParcial('este')">
+          <div style="font-weight:600; font-size:13.5px; color:var(--ink)">Só este mês</div>
+          <div class="muted" style="margin-top:3px; font-weight:400" id="excluir-serie-opcao-este">Mantém todos os outros meses intactos.</div>
+        </button>
+        <button class="btn btn-outline" style="text-align:left; padding:14px 16px" onclick="confirmarExclusaoParcial('futuro')">
+          <div style="font-weight:600; font-size:13.5px; color:var(--ink)">Este mês em diante</div>
+          <div class="muted" style="margin-top:3px; font-weight:400" id="excluir-serie-opcao-futuro">Apaga este e os meses futuros. Os meses anteriores continuam intactos.</div>
+        </button>
+        <button class="btn btn-outline" style="text-align:left; padding:14px 16px; border-color:var(--terracota)" onclick="confirmarExclusaoParcial('serie')">
+          <div style="font-weight:600; font-size:13.5px; color:var(--terracota)">Série inteira</div>
+          <div class="muted" style="margin-top:3px; font-weight:400">Apaga TODOS os meses, incluindo os já passados.</div>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ===== FORM: LANÇAMENTO NO CARTÃO ===== -->
 <div class="overlay" id="overlay-lancamento">
   <div class="sheet">
@@ -1202,7 +1231,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
 import {
   getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc,
-  query, orderBy, where, getDocs, serverTimestamp
+  query, orderBy, where, getDocs, serverTimestamp, runTransaction
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail
@@ -1588,7 +1617,31 @@ const MESES_RECORRENCIA = 11; // gera 11 meses futuros de cara (1 ano junto com 
 // ---------- Auto-extensão de recorrências (mantém a série "fixa" rodando pra sempre) ----------
 const MESES_BUFFER_MINIMO = 6;  // se sobrar menos que isso de meses futuros já gerados, estende
 const MESES_EXTENSAO = 12;      // quantos meses adiciona de cada vez
-let recorrenciasEmExtensao = new Set();
+const JANELA_TRAVA_EXTENSAO_MS = 3 * 60 * 1000; // 3 minutos — tempo que uma trava de extensão fica valendo
+let recorrenciasEmExtensao = new Set(); // trava rápida local (mesma aba) — evita disparo duplo instantâneo
+
+// Trava a extensão de uma série usando um campo no próprio documento mais antigo dela (já pertence ao usuário,
+// então não exige mudança nas regras de segurança do Firestore). Usa transação pra ser segura mesmo com o
+// app aberto em dois dispositivos/abas ao mesmo tempo — só um consegue "ganhar" a trava.
+async function tentarTravarExtensao(colecaoNome, itemMaisAntigoId){
+  const ref = doc(db, colecaoNome, itemMaisAntigoId);
+  try{
+    return await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists()) return false;
+      const dados = snap.data();
+      const agora = Date.now();
+      if (dados.extensaoTravadaEm && (agora - dados.extensaoTravadaEm) < JANELA_TRAVA_EXTENSAO_MS){
+        return false; // outro dispositivo já está cuidando dessa extensão agora
+      }
+      tx.update(ref, { extensaoTravadaEm: agora });
+      return true;
+    });
+  }catch(err){
+    console.error('Erro ao travar extensão de recorrência:', err);
+    return false;
+  }
+}
 
 async function manterRecorrenciasEmDia(lista, colecaoNome, campoData){
   const grupos = {};
@@ -1600,16 +1653,20 @@ async function manterRecorrenciasEmDia(lista, colecaoNome, campoData){
   for (const [recId, itens] of Object.entries(grupos)){
     if (recorrenciasEmExtensao.has(recId)) continue;
     if (itens.some(it => it.finita)) continue; // parcelamento com fim definido — nunca estende sozinho
-    const datas = itens.map(it => new Date(it[campoData] + 'T00:00:00').getTime());
-    const maxData = new Date(Math.max(...datas));
+    const ordenados = [...itens].sort((a,b)=> (a[campoData]||'').localeCompare(b[campoData]||''));
+    const maisAntigo = ordenados[0];
+    const maisRecente = ordenados[ordenados.length-1];
+    const maxData = new Date(maisRecente[campoData] + 'T00:00:00');
     const mesesAFrente = (maxData.getFullYear()-hoje.getFullYear())*12 + (maxData.getMonth()-hoje.getMonth());
     if (mesesAFrente < MESES_BUFFER_MINIMO){
       recorrenciasEmExtensao.add(recId);
-      const ultimoItem = itens.find(it => new Date(it[campoData] + 'T00:00:00').getTime() === maxData.getTime());
-      const dadosBase = { ...ultimoItem };
-      delete dadosBase.id;
-      delete dadosBase.criadoEm;
       try{
+        const travou = await tentarTravarExtensao(colecaoNome, maisAntigo.id);
+        if (!travou) continue; // outro dispositivo já está estendendo essa série agora
+        const dadosBase = { ...maisRecente };
+        delete dadosBase.id;
+        delete dadosBase.criadoEm;
+        delete dadosBase.extensaoTravadaEm;
         await gerarRecorrencia(colecaoNome, dadosBase, campoData, MESES_EXTENSAO);
       } finally {
         recorrenciasEmExtensao.delete(recId);
@@ -1694,21 +1751,60 @@ window.togglePago = async function(id, atual, contaId, valor){
   }
 };
 
+// ---------- Exclusão de itens de série recorrente (despesas e entradas fixas/parceladas) ----------
+let exclusaoSeriePendente = null; // { colecaoNome, id, recorrenciaId, campoData, dataReferencia, labelSingular }
+
+function abrirDialogoExclusaoSerie(colecaoNome, item, campoData, labelSingular, avisoExtra){
+  exclusaoSeriePendente = {
+    colecaoNome, id: item.id, recorrenciaId: item.recorrenciaId,
+    campoData, dataReferencia: item[campoData], labelSingular
+  };
+  document.getElementById('excluir-serie-desc').textContent =
+    `Essa ${labelSingular} faz parte de uma série fixa (se repete todo mês). O que você quer excluir?` + (avisoExtra ? ' ' + avisoExtra : '');
+  document.getElementById('excluir-serie-opcao-este').textContent =
+    `Apaga só ${formatarData(item[campoData])}. Mantém todos os outros meses intactos.`;
+  document.getElementById('excluir-serie-opcao-futuro').textContent =
+    `Apaga a partir de ${formatarData(item[campoData])} (inclusive) em diante. Os meses anteriores continuam intactos.`;
+  document.getElementById('overlay-excluir-serie').classList.add('open');
+}
+
+window.cancelarExclusaoSerie = function(){
+  exclusaoSeriePendente = null;
+  fecharForm('overlay-excluir-serie');
+};
+
+window.confirmarExclusaoParcial = async function(escopo){
+  if (!exclusaoSeriePendente) return;
+  const { colecaoNome, id, recorrenciaId, campoData, dataReferencia, labelSingular } = exclusaoSeriePendente;
+  fecharForm('overlay-excluir-serie');
+  exclusaoSeriePendente = null;
+  const listaAtual = colecaoNome === 'despesas' ? despesas : entradas;
+  const labelPlural = colecaoNome === 'despesas' ? 'despesa' : 'receita';
+  try{
+    if (escopo === 'este'){
+      await deleteDoc(doc(db, colecaoNome, id));
+      toast(`${labelSingular[0].toUpperCase()}${labelSingular.slice(1)} excluída`);
+    } else if (escopo === 'futuro'){
+      const itens = listaAtual.filter(x => x.recorrenciaId === recorrenciaId && (x[campoData]||'') >= dataReferencia);
+      for (const item of itens){ await deleteDoc(doc(db, colecaoNome, item.id)); }
+      toast(`${itens.length} lançamento(s) de ${labelPlural} excluído(s) a partir de ${formatarData(dataReferencia)}`);
+    } else if (escopo === 'serie'){
+      const itens = listaAtual.filter(x => x.recorrenciaId === recorrenciaId);
+      for (const item of itens){ await deleteDoc(doc(db, colecaoNome, item.id)); }
+      toast(`Série excluída (${itens.length} lançamentos)`);
+    }
+  }catch(err){
+    console.error(err);
+    toast('Erro ao excluir. Veja o console.');
+  }
+};
+
 window.excluirDespesa = async function(id){
   const d = despesas.find(x => x.id === id);
   if (!d) return;
 
   if (d.recorrenciaId){
-    const excluirSerie = confirm('Essa despesa faz parte de uma série fixa (se repete todo mês).\n\nOK = excluir a SÉRIE INTEIRA (todos os meses)\nCancelar = excluir só este mês');
-    if (excluirSerie){
-      const serie = despesas.filter(x => x.recorrenciaId === d.recorrenciaId);
-      for (const item of serie){ await deleteDoc(doc(db, 'despesas', item.id)); }
-      toast(`Série excluída (${serie.length} lançamentos)`);
-      return;
-    }
-    if (!confirm('Excluir só este mês (' + formatarData(d.vencimento) + ')?')) return;
-    await deleteDoc(doc(db, 'despesas', id));
-    toast('Despesa excluída');
+    abrirDialogoExclusaoSerie('despesas', d, 'vencimento', 'despesa');
     return;
   }
 
@@ -1772,23 +1868,14 @@ window.toggleRecebido = async function(id, atual, contaId, valor){
 window.excluirEntrada = async function(id){
   const en = entradas.find(e => e.id === id);
   if (!en) return;
-  const avisoRecebida = en.recebido ? ' O valor já somado no saldo não será removido automaticamente.' : '';
+  const avisoRecebida = en.recebido ? 'O valor já somado no saldo não será removido automaticamente.' : '';
 
   if (en.recorrenciaId){
-    const excluirSerie = confirm('Essa receita faz parte de uma série fixa (se repete todo mês).\n\nOK = excluir a SÉRIE INTEIRA (todos os meses)\nCancelar = excluir só este mês' + avisoRecebida);
-    if (excluirSerie){
-      const serie = entradas.filter(e => e.recorrenciaId === en.recorrenciaId);
-      for (const item of serie){ await deleteDoc(doc(db, 'entradas', item.id)); }
-      toast(`Série excluída (${serie.length} lançamentos)`);
-      return;
-    }
-    if (!confirm('Excluir só este mês (' + formatarData(en.data) + ')?')) return;
-    await deleteDoc(doc(db, 'entradas', id));
-    toast('Receita excluída');
+    abrirDialogoExclusaoSerie('entradas', en, 'data', 'receita', avisoRecebida);
     return;
   }
 
-  if (!confirm('Excluir esta receita?' + avisoRecebida)) return;
+  if (!confirm('Excluir esta receita?' + (avisoRecebida ? ' ' + avisoRecebida : ''))) return;
   await deleteDoc(doc(db, 'entradas', id));
   toast('Receita excluída');
 };
