@@ -213,7 +213,9 @@
   .cat-legenda-item{ display:flex; align-items:center; font-size:12px; padding:4px 0; }
   .cat-legenda-item .dot{ width:8px; height:8px; border-radius:99px; margin-right:8px; flex-shrink:0; }
   .cat-legenda-item .nome{ flex:1; }
-  .cat-legenda-item .pct{ font-family:'IBM Plex Mono',monospace; color:var(--ink-soft); font-size:11.5px; }
+  .cat-legenda-item .valores{ text-align:right; }
+  .cat-legenda-item .valor{ font-family:'IBM Plex Mono',monospace; color:var(--ink); font-size:11.5px; font-weight:500; display:block; }
+  .cat-legenda-item .pct{ font-family:'IBM Plex Mono',monospace; color:var(--ink-soft); font-size:10px; display:block; margin-top:1px; }
 
   .kpi-strip{ display:none; }
 
@@ -2870,7 +2872,10 @@ function renderFatura(){
       <div class="cat-legenda-item">
         <span class="dot" style="background:${CORES_CATEGORIA[i % CORES_CATEGORIA.length]}"></span>
         <span class="nome">${nome}</span>
-        <span class="pct">${Math.round(val/totalFatura*100)}%</span>
+        <span class="valores">
+          <span class="valor">${brl(val)}</span>
+          <span class="pct">${Math.round(val/totalFatura*100)}%</span>
+        </span>
       </div>
     `).join('');
   }
@@ -3257,7 +3262,10 @@ function renderHome(){
       <div class="cat-legenda-item">
         <span class="dot" style="background:${CORES_CATEGORIA[i % CORES_CATEGORIA.length]}"></span>
         <span class="nome">${nome}</span>
-        <span class="pct">${Math.round(val/totalCat*100)}%</span>
+        <span class="valores">
+          <span class="valor">${brl(val)}</span>
+          <span class="pct">${Math.round(val/totalCat*100)}%</span>
+        </span>
       </div>
     `).join('');
   }
