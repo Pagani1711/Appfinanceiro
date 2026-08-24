@@ -210,12 +210,19 @@
   }
 
   .cat-bar{ height:9px; border-radius:99px; overflow:hidden; display:flex; background:var(--line); }
-  .cat-legenda-item{ display:flex; align-items:center; font-size:12px; padding:4px 0; }
+  .cat-legenda-item{ display:flex; align-items:center; font-size:12px; padding:4px 0; cursor:pointer; }
   .cat-legenda-item .dot{ width:8px; height:8px; border-radius:99px; margin-right:8px; flex-shrink:0; }
   .cat-legenda-item .nome{ flex:1; }
   .cat-legenda-item .valores{ text-align:right; }
   .cat-legenda-item .valor{ font-family:'IBM Plex Mono',monospace; color:var(--ink); font-size:11.5px; font-weight:500; display:block; }
   .cat-legenda-item .pct{ font-family:'IBM Plex Mono',monospace; color:var(--ink-soft); font-size:10px; display:block; margin-top:1px; }
+  .cat-seta{ margin-left:9px; color:var(--ink-soft); font-size:9px; transition:transform .2s; flex-shrink:0; }
+  .cat-seta.aberto{ transform:rotate(180deg); }
+  .cat-detalhe{ display:none; padding:0 0 8px 16px; }
+  .cat-detalhe.aberto{ display:block; }
+  .cat-detalhe-item{ display:flex; justify-content:space-between; gap:10px; font-size:11px; padding:4px 0; border-top:1px solid var(--line); color:var(--ink-soft); }
+  .cat-detalhe-item .nome{ color:var(--ink); }
+  .cat-detalhe-item .valor{ font-family:'IBM Plex Mono',monospace; white-space:nowrap; }
 
   .kpi-strip{ display:none; }
 
@@ -1265,6 +1272,7 @@ let mesAtual = new Date(); // mês sendo visualizado na aba Contas
 let cartaoAbertoId = null;
 let mesFatura = new Date(); // mês de vencimento da fatura sendo visualizada
 let periodoProjecaoMeses = 3; // período selecionado no card de Projeção Financeira & Fluxo de Caixa (Início)
+const categoriaExpandida = { home: new Set(), fatura: new Set() }; // categorias com o detalhe aberto (acordeão)
 
 // ---------- Navegação ----------
 window.mudarView = function(nome){
@@ -1523,6 +1531,44 @@ function toast(msg){
 function brl(v){
   const sign = v < 0 ? "-" : "";
   return sign + "R$ " + Math.abs(v).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+// ---------- Acordeão de categorias (usado em "Onde foi seu dinheiro" e na fatura do cartão) ----------
+window.toggleCategoriaExpandida = function(escopo, categoria){
+  const set = categoriaExpandida[escopo];
+  if (set.has(categoria)) set.delete(categoria); else set.add(categoria);
+  if (escopo === 'home') renderHome(); else renderFatura();
+};
+
+// Constrói o HTML da legenda + detalhe expansível a partir de um mapa {categoria: valor} e uma lista de itens
+// {nome, categoria, valor, origemLabel?} usada pra montar o detalhe de cada categoria ao expandir.
+function renderLegendaCategoriaComDetalhe(catsOrdenadas, totalCat, itensPorCategoria, escopo){
+  return catsOrdenadas.map(([nome,val],i) => {
+    const cor = CORES_CATEGORIA[i % CORES_CATEGORIA.length];
+    const expandido = categoriaExpandida[escopo].has(nome);
+    const itensDaCategoria = (itensPorCategoria[nome]||[]).slice().sort((a,b)=> b.valor - a.valor);
+    const chaveEscape = nome.replace(/'/g,"\\'");
+    return `
+    <div class="cat-grupo">
+      <div class="cat-legenda-item" onclick="toggleCategoriaExpandida('${escopo}','${chaveEscape}')">
+        <span class="dot" style="background:${cor}"></span>
+        <span class="nome">${nome}</span>
+        <span class="valores">
+          <span class="valor">${brl(val)}</span>
+          <span class="pct">${Math.round(val/totalCat*100)}%</span>
+        </span>
+        <span class="cat-seta ${expandido ? 'aberto' : ''}">▾</span>
+      </div>
+      <div class="cat-detalhe ${expandido ? 'aberto' : ''}">
+        ${itensDaCategoria.map(it => `
+          <div class="cat-detalhe-item">
+            <span class="nome">${it.nome}${it.origemLabel ? ' · '+it.origemLabel : ''}</span>
+            <span class="valor">${brl(it.valor)}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ---------- Contas ----------
@@ -2856,7 +2902,11 @@ function renderFatura(){
 
   // categoria
   const porCategoria = {};
-  itensFatura.forEach(it => { porCategoria[it.categoria] = (porCategoria[it.categoria]||0) + it.valor; });
+  const itensPorCategoriaFatura = {};
+  itensFatura.forEach(it => {
+    porCategoria[it.categoria] = (porCategoria[it.categoria]||0) + it.valor;
+    (itensPorCategoriaFatura[it.categoria] = itensPorCategoriaFatura[it.categoria]||[]).push({ nome: it.descricao, valor: it.valor });
+  });
   const catsOrdenadas = Object.entries(porCategoria).sort((a,b)=> b[1]-a[1]);
   const barEl = document.getElementById('fatura-cat-bar');
   const legEl = document.getElementById('fatura-cat-legenda');
@@ -2868,16 +2918,7 @@ function renderFatura(){
     barEl.innerHTML = catsOrdenadas.map(([nome,val],i) =>
       `<div style="width:${(val/totalFatura*100)}%; background:${CORES_CATEGORIA[i % CORES_CATEGORIA.length]}"></div>`
     ).join('');
-    legEl.innerHTML = catsOrdenadas.map(([nome,val],i) => `
-      <div class="cat-legenda-item">
-        <span class="dot" style="background:${CORES_CATEGORIA[i % CORES_CATEGORIA.length]}"></span>
-        <span class="nome">${nome}</span>
-        <span class="valores">
-          <span class="valor">${brl(val)}</span>
-          <span class="pct">${Math.round(val/totalFatura*100)}%</span>
-        </span>
-      </div>
-    `).join('');
+    legEl.innerHTML = renderLegendaCategoriaComDetalhe(catsOrdenadas, totalFatura, itensPorCategoriaFatura, 'fatura');
   }
 
   // parcelas — soma, por mês de vencimento, os itens expandidos dos próximos 6 meses
@@ -3243,9 +3284,22 @@ function renderHome(){
     ? `${brl(faltaPagarValor)} ainda a pagar este mês, entre fixas e variáveis.`
     : 'Nenhuma despesa cadastrada ainda';
 
-  // --- Gastos por categoria (mês atual, maior para menor) ---
+  // --- Gastos por categoria (mês atual: despesas avulsas + faturas de cartão do mês, seguindo o mês de VENCIMENTO
+  //     da fatura — não a data da compra — porque é nesse mês que o dinheiro efetivamente sai da conta e conta
+  //     contra o orçamento daquele mês, mesmo que a compra tenha sido feita antes) ---
+  const itensCategoriaHome = [];
+  doMesReal.forEach(d => itensCategoriaHome.push({ nome: d.nome, categoria: d.categoria, valor: d.valor||0 }));
+  cartoes.forEach(cart => {
+    itensDaFaturaPara(cart.id, chaveMesAtualReal).forEach(it => {
+      itensCategoriaHome.push({ nome: it.descricao, categoria: it.categoria, valor: it.valor, origemLabel: '💳 '+cart.nome });
+    });
+  });
   const porCategoria = {};
-  doMesReal.forEach(d => { porCategoria[d.categoria] = (porCategoria[d.categoria]||0) + (d.valor||0); });
+  const itensPorCategoriaHome = {};
+  itensCategoriaHome.forEach(it => {
+    porCategoria[it.categoria] = (porCategoria[it.categoria]||0) + it.valor;
+    (itensPorCategoriaHome[it.categoria] = itensPorCategoriaHome[it.categoria]||[]).push(it);
+  });
   const catsOrdenadas = Object.entries(porCategoria).sort((a,b)=> b[1]-a[1]);
   const totalCat = catsOrdenadas.reduce((s,[,v])=> s+v, 0);
   const barEl = document.getElementById('home-cat-bar');
@@ -3258,16 +3312,7 @@ function renderHome(){
     barEl.innerHTML = catsOrdenadas.map(([nome,val],i) =>
       `<div style="width:${(val/totalCat*100)}%; background:${CORES_CATEGORIA[i % CORES_CATEGORIA.length]}"></div>`
     ).join('');
-    legEl.innerHTML = catsOrdenadas.map(([nome,val],i) => `
-      <div class="cat-legenda-item">
-        <span class="dot" style="background:${CORES_CATEGORIA[i % CORES_CATEGORIA.length]}"></span>
-        <span class="nome">${nome}</span>
-        <span class="valores">
-          <span class="valor">${brl(val)}</span>
-          <span class="pct">${Math.round(val/totalCat*100)}%</span>
-        </span>
-      </div>
-    `).join('');
+    legEl.innerHTML = renderLegendaCategoriaComDetalhe(catsOrdenadas, totalCat, itensPorCategoriaHome, 'home');
   }
 
   // --- Comparativo com mês anterior ---
@@ -3303,11 +3348,13 @@ function renderDistribuicaoMes(chaveMes, totalReceitas){
     somaGrupo[grupo] += (d.valor||0);
   });
 
-  // gastos de cartão do mês, por grupo — aqui conta pela DATA DA COMPRA (não pela fatura),
-  // pra refletir o hábito de gasto do dia a dia, mesmo que a fatura só feche depois
-  lancamentosCartao.filter(l => (l.data||'').startsWith(chaveMes)).forEach(l => {
-    const grupo = l.grupo || CATEGORIA_GRUPO[l.categoria] || 'Essencial';
-    somaGrupo[grupo] += valorParcelaDe(l);
+  // gastos de cartão do mês, por grupo — agora conta pelo mês de VENCIMENTO da fatura (não pela data da compra),
+  // já que é nesse mês que o valor efetivamente sai da conta e consome o orçamento daquele mês
+  cartoes.forEach(cart => {
+    itensDaFaturaPara(cart.id, chaveMes).forEach(it => {
+      const grupo = it.grupo || CATEGORIA_GRUPO[it.categoria] || 'Essencial';
+      somaGrupo[grupo] += it.valor;
+    });
   });
 
   // "Investimento" só conta o que foi marcado com esse grupo em despesas/lançamentos de cartão
