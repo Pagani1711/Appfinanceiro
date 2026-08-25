@@ -2867,7 +2867,16 @@ function renderCartoes(){
 
 window.abrirFatura = function(cartaoId){
   cartaoAbertoId = cartaoId;
-  mesFatura = new Date();
+  // abre direto na fatura que está ABERTA/acumulando agora (mesma lógica usada na lista de cartões),
+  // não simplesmente no mês-calendário atual — que pode já ter fechado, dependendo do dia de fechamento
+  const cart = cartoes.find(c => c.id === cartaoId);
+  if (cart){
+    const hojeISO = new Date().toISOString().slice(0,10);
+    const [ano, mes] = mesFaturaDe(hojeISO, cart).split('-').map(Number);
+    mesFatura = new Date(ano, mes-1, 1);
+  } else {
+    mesFatura = new Date();
+  }
   document.getElementById('cartoes-painel-lista').style.display = 'none';
   document.getElementById('cartoes-painel-fatura').style.display = '';
   renderFatura();
@@ -2886,15 +2895,24 @@ window.mudarMesFatura = function(delta){
   renderFatura();
 };
 
+// Mês de REFERÊNCIA de uma fatura (mês em que a maior parte dos gastos do ciclo aconteceu) —
+// é sempre o mês anterior ao mês de VENCIMENTO. Usado só pra exibição (título, seletor, gráfico de parcelas);
+// o cálculo de quais lançamentos entram na fatura e quando o dinheiro sai da conta continua baseado no vencimento real.
+function mesReferenciaDe(dataVencimento){
+  return new Date(dataVencimento.getFullYear(), dataVencimento.getMonth()-1, 1);
+}
+
 function renderFatura(){
   const cart = cartoes.find(c => c.id === cartaoAbertoId);
   if (!cart) return;
-  const chaveFatura = mesChave(mesFatura);
+  const chaveFatura = mesChave(mesFatura); // segue representando o mês de VENCIMENTO — usado em todo o cálculo/filtro abaixo
+  const mesRef = mesReferenciaDe(mesFatura); // só pra exibição
 
   document.getElementById('fatura-cartao-nome').textContent = cart.nome.toUpperCase() + (cart.final ? ' · FINAL '+cart.final : '');
-  document.getElementById('fatura-titulo').textContent = 'Fatura de ' + NOMES_MES[mesFatura.getMonth()];
-  document.getElementById('fatura-mes-label').textContent = NOMES_MES[mesFatura.getMonth()] + '/' + mesFatura.getFullYear();
-  document.getElementById('fatura-fechamento-info').textContent = `Fecha dia ${diaFechamentoEm(cart, new Date().toISOString().slice(0,10))} (atual) · Vence dia ${cart.diaVencimento}`;
+  document.getElementById('fatura-titulo').textContent = 'Fatura de ' + NOMES_MES[mesRef.getMonth()];
+  document.getElementById('fatura-mes-label').textContent = NOMES_MES[mesRef.getMonth()] + '/' + mesRef.getFullYear();
+  document.getElementById('fatura-fechamento-info').textContent =
+    `Fecha dia ${diaFechamentoEm(cart, new Date().toISOString().slice(0,10))} (atual) · Vence ${cart.diaVencimento}/${String(mesFatura.getMonth()+1).padStart(2,'0')} (${NOMES_MES[mesFatura.getMonth()]})`;
 
   const itensFatura = itensDaFaturaPara(cart.id, chaveFatura).sort((a,b)=> (b.data||'').localeCompare(a.data||''));
   const totalFatura = itensFatura.reduce((s,it)=> s + it.valor, 0);
@@ -2938,13 +2956,15 @@ function renderFatura(){
     parcelasEl.innerHTML = `<div class="card" style="display:flex; align-items:flex-end; gap:8px; padding-top:24px">` +
       mesesParcela.map(([chave,val]) => {
         const [ano,mes] = chave.split('-').map(Number);
+        const dataVenc = new Date(ano, mes-1, 1);
+        const dataRef = mesReferenciaDe(dataVenc); // rótulo mostra o mês de referência, não o de vencimento
         const altura = 8 + (val/maxV)*54;
         const atual = chave === chaveFatura;
         return `
         <div style="flex:1; text-align:center">
           <div class="mono" style="font-size:9px; color:var(--ink-soft); margin-bottom:4px">${brl(val).replace('R$ ','')}</div>
           <div style="height:${altura}px; border-radius:5px; background:${atual?'var(--navy)':'var(--gold)'}"></div>
-          <div style="font-size:9.5px; color:var(--ink-soft); margin-top:6px">${NOMES_MES[mes-1].slice(0,3)}/${String(ano).slice(2)}</div>
+          <div style="font-size:9.5px; color:var(--ink-soft); margin-top:6px">${NOMES_MES[dataRef.getMonth()].slice(0,3)}/${String(dataRef.getFullYear()).slice(2)}</div>
         </div>`;
       }).join('') + `</div>`;
   }
