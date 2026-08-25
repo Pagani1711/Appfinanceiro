@@ -298,7 +298,7 @@
     #view-home main{
       display:grid; grid-template-columns:repeat(4, 1fr); column-gap:14px; row-gap:16px; align-items:start;
     }
-    #view-home .acoes-rapidas{ grid-column:1 / -1; margin-bottom:0; }
+    #view-home .acoes-rapidas{ display:none; } /* ações rápidas só fazem sentido no mobile — no desktop tudo já está acessível pela sidebar */
     #view-home .db-block{ margin-bottom:0; margin-top:0 !important; }
     #view-home .db-projecao{ grid-column:1 / -1; }
     #view-home .db-ring{ grid-column:span 1; }
@@ -306,7 +306,10 @@
     #view-home .db-categoria{ grid-column:span 2; }
     #view-home .db-comparativo{ grid-column:span 2; }
     #view-home .db-quote{ grid-column:span 2; }
-    #view-home .db-distribuicao{ grid-column:span 2; }
+    #view-home .db-distribuicao{ grid-column:1 / -1; }
+    #view-home #home-distribuicao{ display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; align-items:start; }
+    #view-home #home-distribuicao .card{ margin-bottom:0; }
+    #view-home #home-distribuicao .empty-hint{ grid-column:1 / -1; }
 
     /* ---- Cards com borda de destaque colorida (só no desktop) ---- */
     #view-home .db-block .card{ border-left:4px solid var(--line); }
@@ -500,7 +503,14 @@
     </div>
 
     <div class="db-block db-distribuicao">
-      <div class="section-title">Distribuição do mês</div>
+      <div class="section-title row-between" style="align-items:center">
+        <span>Distribuição do mês</span>
+        <div class="month-switch" style="margin:0; gap:8px">
+          <button onclick="mudarMesDistribuicao(-1)">‹</button>
+          <span class="label" id="distrib-mes-label" style="min-width:auto; font-size:12px">—</span>
+          <button onclick="mudarMesDistribuicao(1)">›</button>
+        </div>
+      </div>
       <div class="muted" style="margin:-6px 2px 12px; font-size:11.5px">Meta: 70% Essencial · 20% Lazer · 10% Investimento</div>
       <div id="home-distribuicao"></div>
     </div>
@@ -817,7 +827,7 @@
   <div class="sheet">
     <div class="sheet-header">
       <button onclick="fecharForm('overlay-lancamento')">←</button>
-      <h2>Novo lançamento</h2>
+      <h2 id="lanc-sheet-title">Novo lançamento</h2>
     </div>
     <form id="form-lancamento" onsubmit="salvarLancamento(event)">
       <div class="campo">
@@ -887,7 +897,7 @@
         <label>Total de parcelas</label>
         <input type="number" min="1" inputmode="numeric" id="lanc-parcela-total" placeholder="Ex: 5">
       </div>
-      <button class="btn btn-primary" type="submit">Salvar lançamento</button>
+      <button class="btn btn-primary" type="submit" id="lanc-submit-btn">Salvar lançamento</button>
     </form>
   </div>
 </div>
@@ -1412,7 +1422,47 @@ window.abrirFormCartao = function(id){
   document.getElementById('overlay-cartao').classList.add('open');
 };
 
-window.abrirFormLancamento = function(){ document.getElementById('overlay-lancamento').classList.add('open'); };
+let lancamentoEditandoId = null;
+
+window.abrirFormLancamento = function(id){
+  document.getElementById('form-lancamento').reset();
+  lancamentoEditandoId = id || null;
+
+  // reseta os toggles visuais pro estado padrão antes de aplicar os valores do item (se for edição)
+  const tipoBtnPadrao = document.querySelector('#form-lancamento [onclick="toggleSeg(this)"][data-val="Variável"]');
+  if (tipoBtnPadrao) toggleSeg(tipoBtnPadrao);
+  const grupoBtnPadrao = document.querySelector('#form-lancamento [onclick="toggleSeg(this)"][data-val="Essencial"]');
+  if (grupoBtnPadrao) toggleSeg(grupoBtnPadrao);
+  const parceladoBtnPadrao = document.querySelector('#form-lancamento [onclick="toggleParcelado(this)"][data-val="nao"]');
+  if (parceladoBtnPadrao) toggleParcelado(parceladoBtnPadrao);
+
+  if (id){
+    const l = lancamentosCartao.find(x => x.id === id);
+    if (!l) return;
+    document.getElementById('lanc-sheet-title').textContent = 'Editar lançamento';
+    document.getElementById('lanc-submit-btn').textContent = 'Salvar alterações';
+    document.getElementById('lanc-descricao').value = l.descricao || '';
+    document.getElementById('lanc-valor').value = l.valor || '';
+    document.getElementById('lanc-data').value = l.data || '';
+    document.getElementById('lanc-categoria').value = l.categoria || 'Outros';
+    const tipoBtn = document.querySelector('#form-lancamento [onclick="toggleSeg(this)"][data-val="'+l.tipo+'"]');
+    if (tipoBtn) toggleSeg(tipoBtn);
+    const grupoBtn = document.querySelector('#form-lancamento [onclick="toggleSeg(this)"][data-val="'+(l.grupo||'Essencial')+'"]');
+    if (grupoBtn) toggleSeg(grupoBtn);
+    if (l.parcelaTotal > 1){
+      const parceladoBtn = document.querySelector('#form-lancamento [onclick="toggleParcelado(this)"][data-val="sim"]');
+      if (parceladoBtn) toggleParcelado(parceladoBtn);
+      document.getElementById('lanc-parcela-atual').value = l.parcelaAtual || 1;
+      document.getElementById('lanc-parcela-total').value = l.parcelaTotal || 1;
+      document.getElementById('lanc-valor').value = l.valor || ''; // valor TOTAL da compra (não a parcela)
+    }
+  } else {
+    document.getElementById('lanc-sheet-title').textContent = 'Novo lançamento';
+    document.getElementById('lanc-submit-btn').textContent = 'Salvar lançamento';
+  }
+
+  document.getElementById('overlay-lancamento').classList.add('open');
+};
 
 window.toggleParceladoDespesa = function(btn){
   toggleSeg(btn);
@@ -2981,7 +3031,7 @@ function renderFatura(){
           <div class="despesa-sub">${formatarData(it.data)} · ${it.categoria}${it.parcelaTotal>1 ? ' · '+it.parcelaAtual+'/'+it.parcelaTotal : ''}${it.tipo==='Fixa' ? ' · Fixa/Assinatura' : ''}${!it.real ? ' · projeção' : ''}</div>
         </div>
         <div class="despesa-valor" style="color:var(--terracota)">${brl(it.valor)}</div>
-        ${it.real ? `<button class="del-btn" onclick="excluirLancamento('${it.origemId}')">✕</button>` : `<span class="muted" style="font-size:11px">futuro</span>`}
+        ${it.real ? `<button class="del-btn" onclick="abrirFormLancamento('${it.origemId}')">✏️</button><button class="del-btn" onclick="excluirLancamento('${it.origemId}')">✕</button>` : `<span class="muted" style="font-size:11px">futuro</span>`}
       </div>
     `).join('');
   }
@@ -3000,13 +3050,21 @@ window.salvarLancamento = async function(e){
   const parcelaTotal = parcelado ? parseInt(document.getElementById('lanc-parcela-total').value || 1) : 1;
   const valorParcela = parcelaTotal > 1 ? valor/parcelaTotal : valor; // "Valor" informado é o TOTAL da compra
   try{
-    await addDoc(collection(db, 'lancamentosCartao'), {
-      cartaoId: cartaoAbertoId, descricao, valor, valorParcela, data, categoria, tipo, grupo, parcelaAtual, parcelaTotal,
-      userId: usuarioAtual.uid, criadoEm: serverTimestamp()
-    });
-    toast('Lançamento salvo!');
+    if (lancamentoEditandoId){
+      await updateDoc(doc(db, 'lancamentosCartao', lancamentoEditandoId), {
+        descricao, valor, valorParcela, data, categoria, tipo, grupo, parcelaAtual, parcelaTotal
+      });
+      toast('Lançamento atualizado!');
+    } else {
+      await addDoc(collection(db, 'lancamentosCartao'), {
+        cartaoId: cartaoAbertoId, descricao, valor, valorParcela, data, categoria, tipo, grupo, parcelaAtual, parcelaTotal,
+        userId: usuarioAtual.uid, criadoEm: serverTimestamp()
+      });
+      toast('Lançamento salvo!');
+    }
     document.getElementById('form-lancamento').reset();
     fecharForm('overlay-lancamento');
+    lancamentoEditandoId = null;
   }catch(err){
     console.error(err);
     toast('Erro ao salvar. Veja o console.');
@@ -3353,7 +3411,26 @@ function renderHome(){
     document.getElementById('kpi-saidas-sub').textContent = `${subiu?'↑':'↓'} ${Math.abs(variacao).toFixed(1)}% vs mês passado`;
   }
 
-  renderDistribuicaoMes(chaveMesAtualReal, totalEntradasMesTodas);
+  atualizarDistribuicaoView();
+}
+
+let mesDistribuicao = new Date(); // mês sendo visualizado no card "Distribuição do mês" — independente do mês real, navegável
+
+window.mudarMesDistribuicao = function(delta){
+  mesDistribuicao.setMonth(mesDistribuicao.getMonth() + delta);
+  mesDistribuicao = new Date(mesDistribuicao);
+  atualizarDistribuicaoView();
+};
+
+// Recalcula entradas do mês alvo e chama o render — separado de renderHome pra permitir navegar
+// entre meses sem depender de um novo snapshot do Firestore
+function atualizarDistribuicaoView(){
+  const labelEl = document.getElementById('distrib-mes-label');
+  if (!labelEl) return; // view ainda não montada
+  labelEl.textContent = NOMES_MES[mesDistribuicao.getMonth()].slice(0,3) + '/' + mesDistribuicao.getFullYear();
+  const chaveMes = mesChave(mesDistribuicao);
+  const totalReceitasMes = entradas.filter(en => (en.data||'').startsWith(chaveMes)).reduce((s,en)=> s + (en.valor||0), 0);
+  renderDistribuicaoMes(chaveMes, totalReceitasMes);
 }
 
 // --- Distribuição Essencial / Lazer / Investimento, comparada com a meta ---
