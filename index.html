@@ -3223,14 +3223,25 @@ function renderProjecaoFluxoCaixa(){
   }
 
   const saldoContasAtual = contas.reduce((s,c)=> s + (c.saldo||0), 0);
+  // Pro mês atual, soma só o que ainda está PENDENTE (não pago/recebido) — o que já foi liquidado já está
+  // refletido no saldo real das contas, então somar o mês inteiro de novo duplicaria esse valor.
+  const chaveHoje = mesChave(hoje);
+  const despesasPendentesHoje = despesas.filter(d => (d.vencimento||'').startsWith(chaveHoje) && !d.pago).reduce((s,d)=>s+(d.valor||0),0);
+  const receitasPendentesHoje = entradas.filter(en => (en.data||'').startsWith(chaveHoje) && !en.recebido).reduce((s,en)=>s+(en.valor||0),0);
+  const faturaPendenteHoje = cartoes.reduce((s,c)=> s + totalFaturaDe(c.id, chaveHoje), 0);
+  const saldoPendenteMesAtual = receitasPendentesHoje - despesasPendentesHoje - faturaPendenteHoje;
+
   let cumulativo = saldoContasAtual;
-  meses.forEach(m => { cumulativo += m.saldoMes; m.caixaAcumulado = cumulativo; });
+  meses.forEach((m,i) => {
+    cumulativo += (i === 0 ? saldoPendenteMesAtual : m.saldoMes);
+    m.caixaAcumulado = cumulativo;
+  });
 
   const acumuloLiquido = meses.reduce((s,m)=> s + m.saldoMes, 0);
   const somaEntradasPeriodo = meses.reduce((s,m)=> s + m.entradasMes, 0);
   const sobraMedia = acumuloLiquido / periodoProjecaoMeses;
   const taxaPoupanca = somaEntradasPeriodo > 0 ? (acumuloLiquido / somaEntradasPeriodo * 100) : 0;
-  const saldoCaixaFinal = saldoContasAtual + acumuloLiquido;
+  const saldoCaixaFinal = meses[meses.length-1].caixaAcumulado; // usa a cadeia já corrigida (sem duplicar o que já foi liquidado no mês atual)
   const mesAtualFluxo = meses[0];
   const mesFinalNome = NOMES_MES[meses[meses.length-1].dataMes.getMonth()].slice(0,3) + '/' + String(meses[meses.length-1].dataMes.getFullYear()).slice(2);
 
