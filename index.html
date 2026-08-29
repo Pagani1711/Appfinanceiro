@@ -456,6 +456,8 @@
 
       <div class="proj-kpis" id="proj-kpis"></div>
 
+      <div id="proj-alerta-caixa"></div>
+
       <div class="proj-meses-cards" id="proj-meses-cards"></div>
     </div>
 
@@ -3186,6 +3188,110 @@ const CATEGORIA_GRUPO = {
 };
 const METAS_DISTRIBUICAO = { Essencial:70, Lazer:20, Investimento:10 };
 
+// Constrói o saldo de caixa dia a dia (não só por mês) — a partir de hoje até uma data final,
+// somando/subtraindo cada entrada/despesa/fatura de cartão exatamente no dia em que ela acontece.
+// É isso que revela o "vale" no meio do mês que o card por-mês (agregado) não mostra: mesmo que o
+// saldo feche bem no fim de Setembro, pode faltar dinheiro nos primeiros dias de Outubro, antes da
+// próxima receita cair — coisa que só aparece olhando dia a dia, não só o total do mês.
+function construirFluxoCaixaDiario(diasFinalISO){
+  const hojeISO = new Date().toISOString().slice(0,10);
+  const deltaPorDia = {};
+  function somar(dataISO, valor){
+    if (!dataISO) return;
+    deltaPorDia[dataISO] = (deltaPorDia[dataISO]||0) + valor;
+  }
+
+  // só conta o que ainda está PENDENTE — o que já foi pago/recebido já está refletido no saldo atual das contas
+  entradas.filter(en => !en.recebido && en.data >= hojeISO && en.data <= diasFinalISO)
+    .forEach(en => somar(en.data, en.valor||0));
+  despesas.filter(d => !d.pago && d.vencimento >= hojeISO && d.vencimento <= diasFinalISO)
+    .forEach(d => somar(d.vencimento, -(d.valor||0)));
+
+  // faturas de cartão: um débito por mês, exatamente no dia de vencimento de cada cartão
+  const dataFinalObj = new Date(diasFinalISO + 'T00:00:00');
+  let dMes = new Date(); dMes.setDate(1);
+  while (mesChave(dMes) <= mesChave(dataFinalObj)){
+    const chave = mesChave(dMes);
+    cartoes.forEach(cart => {
+      const total = totalFaturaDe(cart.id, chave);
+      if (total > 0){
+        const ultimoDiaMes = new Date(dMes.getFullYear(), dMes.getMonth()+1, 0).getDate();
+        const diaVenc = Math.min(cart.diaVencimento || 10, ultimoDiaMes);
+        const dataVencISO = `${dMes.getFullYear()}-${String(dMes.getMonth()+1).padStart(2,'0')}-${String(diaVenc).padStart(2,'0')}`;
+        if (dataVencISO >= hojeISO && dataVencISO <= diasFinalISO) somar(dataVencISO, -total);
+      }
+    });
+    dMes.setMonth(dMes.getMonth()+1);
+  }
+
+  // caminha dia a dia acumulando a partir do saldo real de hoje
+  const saldoInicial = contas.reduce((s,c)=> s + (c.saldo||0), 0);
+  let cumulativo = saldoInicial;
+  const serie = [];
+  let d = new Date(hojeISO + 'T00:00:00');
+  const fim = new Date(diasFinalISO + 'T00:00:00');
+  while (d <= fim){
+    const iso = d.toISOString().slice(0,10);
+    cumulativo += (deltaPorDia[iso] || 0);
+    serie.push({ data: iso, saldo: cumulativo });
+    d.setDate(d.getDate()+1);
+  }
+  return serie;
+}
+
+function renderAlertaCaixaBaixo(serieDiaria){
+  const el = document.getElementById('proj-alerta-caixa');
+  if (!el || serieDiaria.length === 0) return;
+
+  const pontoMinimo = serieDiaria.reduce((min,p)=> p.saldo < min.saldo ? p : min, serieDiaria[0]);
+  const limiteChequeEspecial = contas.filter(c=>c.temLimite).reduce((s,c)=> s + (c.limite||0), 0);
+
+  let tom, titulo, texto;
+  if (pontoMinimo.saldo >= 0){
+    tom = 'tone-green';
+    titulo = `✓ Caixa não fica negativo no período`;
+    texto = `Ponto mais baixo projetado: ${brl(pontoMinimo.saldo)} em ${formatarData(pontoMinimo.data)}.`;
+  } else if (Math.abs(pontoMinimo.saldo) <= limiteChequeEspecial){
+    tom = 'tone-gold';
+    titulo = `⚠ Vai precisar de cheque especial em ${formatarData(pontoMinimo.data)}`;
+    texto = `Ponto mais baixo projetado: ${brl(pontoMinimo.saldo)} — dentro do limite disponível (${brl(limiteChequeEspecial)}), mas fica no vermelho até a próxima receita cair.`;
+  } else {
+    tom = 'tone-terracota';
+    titulo = `⚠ Ponto mais baixo estoura o cheque especial em ${formatarData(pontoMinimo.data)}`;
+    texto = `Projeção: ${brl(pontoMinimo.saldo)}, além do limite disponível (${brl(limiteChequeEspecial)}). Faltariam ${brl(Math.abs(pontoMinimo.saldo)-limiteChequeEspecial)} pra cobrir essa data.`;
+  }
+
+  el.innerHTML = `
+    <div class="proj-kpi-tile ${tom}" style="margin-bottom:14px">
+      <div class="lbl" style="font-size:11px">${titulo}</div>
+      <div class="sub" style="margin-top:6px; font-weight:400; line-height:1.5; font-size:11.5px; opacity:.95">${texto}</div>
+      <div style="margin-top:12px">${svgFluxoCaixaDiario(serieDiaria, pontoMinimo)}</div>
+    </div>`;
+}
+
+// Mini gráfico de linha SVG mostrando a evolução dia a dia do saldo (o "dente de serra" entre receita e contas)
+function svgFluxoCaixaDiario(serie, pontoMinimo){
+  const largura = 700, altura = 130, margemY = 14;
+  const valores = serie.map(p => p.saldo);
+  let yMin = Math.min(0, ...valores);
+  let yMax = Math.max(0, ...valores);
+  if (yMax === yMin){ yMax += 1; yMin -= 1; }
+  const escalaY = v => altura - margemY - ((v - yMin)/(yMax - yMin)) * (altura - margemY*2);
+  const escalaX = i => (i/(serie.length-1||1)) * largura;
+
+  const pontos = serie.map((p,i) => `${escalaX(i).toFixed(1)},${escalaY(p.saldo).toFixed(1)}`).join(' ');
+  const yZero = escalaY(0);
+  const idxMinimo = serie.findIndex(p => p.data === pontoMinimo.data);
+  const corLinha = pontoMinimo.saldo < 0 ? '#E8A96B' : '#9FD3B0';
+
+  return `
+  <svg viewBox="0 0 ${largura} ${altura}" style="width:100%; height:auto; display:block" preserveAspectRatio="none">
+    <line x1="0" y1="${yZero}" x2="${largura}" y2="${yZero}" stroke="rgba(255,255,255,.35)" stroke-width="1" stroke-dasharray="4 4"/>
+    <polyline points="${pontos}" fill="none" stroke="${corLinha}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${escalaX(idxMinimo).toFixed(1)}" cy="${escalaY(pontoMinimo.saldo).toFixed(1)}" r="4.5" fill="#fff" stroke="${corLinha}" stroke-width="2"/>
+  </svg>`;
+}
+
 // ---------- Projeção Financeira & Fluxo de Caixa (Início) ----------
 window.mudarPeriodoProjecao = function(meses){
   periodoProjecaoMeses = meses;
@@ -3251,6 +3357,12 @@ function renderProjecaoFluxoCaixa(){
   const mesAtualFluxo = meses[0];
   const mesFinalNome = NOMES_MES[meses[meses.length-1].dataMes.getMonth()].slice(0,3) + '/' + String(meses[meses.length-1].dataMes.getFullYear()).slice(2);
 
+  // --- Fluxo de caixa dia a dia (revela o ponto mais baixo entre um mês e outro, não só o total de cada mês) ---
+  const ultimoDiaPeriodo = new Date(hoje.getFullYear(), hoje.getMonth()+periodoProjecaoMeses, 0);
+  const diasFinalISO = ultimoDiaPeriodo.toISOString().slice(0,10);
+  const serieDiaria = construirFluxoCaixaDiario(diasFinalISO);
+  renderAlertaCaixaBaixo(serieDiaria);
+
   // --- KPIs ---
   kpisEl.innerHTML = `
     <div class="proj-kpi-tile tone-navy">
@@ -3307,6 +3419,17 @@ function renderProjecaoFluxoCaixa(){
           <span class="muted">Caixa Acumulado:</span>
           <span class="mono" style="font-weight:500">${brl(m.caixaAcumulado)}</span>
         </div>
+        ${(() => {
+          const doMesSerie = serieDiaria.filter(p => p.data.startsWith(m.chave));
+          if (doMesSerie.length === 0) return '';
+          const minLocal = doMesSerie.reduce((min,p)=> p.saldo < min.saldo ? p : min, doMesSerie[0]);
+          const corMin = minLocal.saldo < 0 ? 'var(--terracota)' : 'var(--ink-soft)';
+          return `
+        <div class="row-between" style="margin-top:6px">
+          <span class="muted">Menor saldo do mês:</span>
+          <span class="mono" style="font-weight:500; color:${corMin}">${brl(minLocal.saldo)} em ${formatarData(minLocal.data)}</span>
+        </div>`;
+        })()}
       </div>
     </div>`;
   }).join('');
