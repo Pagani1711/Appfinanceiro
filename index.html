@@ -1283,6 +1283,7 @@ let cartaoAbertoId = null;
 let mesFatura = new Date(); // mês de vencimento da fatura sendo visualizada
 let periodoProjecaoMeses = 3; // período selecionado no card de Projeção Financeira & Fluxo de Caixa (Início)
 const categoriaExpandida = { home: new Set(), fatura: new Set() }; // categorias com o detalhe aberto (acordeão)
+const distribuicaoExpandida = new Set(); // grupos (Essencial/Lazer/Investimento) com o detalhe aberto no card "Distribuição do mês"
 
 // ---------- Navegação ----------
 window.mudarView = function(nome){
@@ -1588,6 +1589,11 @@ window.toggleCategoriaExpandida = function(escopo, categoria){
   const set = categoriaExpandida[escopo];
   if (set.has(categoria)) set.delete(categoria); else set.add(categoria);
   if (escopo === 'home') renderHome(); else renderFatura();
+};
+
+window.toggleDistribuicaoExpandida = function(grupo){
+  if (distribuicaoExpandida.has(grupo)) distribuicaoExpandida.delete(grupo); else distribuicaoExpandida.add(grupo);
+  atualizarDistribuicaoView();
 };
 
 // Constrói o HTML da legenda + detalhe expansível a partir de um mapa {categoria: valor} e uma lista de itens
@@ -3453,9 +3459,11 @@ function renderDistribuicaoMes(chaveMes, totalReceitas){
 
   // despesas avulsas do mês, por grupo (usa o grupo escolhido no lançamento; se não tiver — dados antigos — cai no mapa por categoria)
   const somaGrupo = { Essencial:0, Lazer:0, Investimento:0 };
+  const itensPorGrupo = { Essencial:[], Lazer:[], Investimento:[] };
   despesas.filter(d => (d.vencimento||'').startsWith(chaveMes)).forEach(d => {
     const grupo = d.grupo || CATEGORIA_GRUPO[d.categoria] || 'Essencial';
     somaGrupo[grupo] += (d.valor||0);
+    itensPorGrupo[grupo].push({ nome: d.nome, valor: d.valor||0 });
   });
 
   // gastos de cartão do mês, por grupo — agora conta pelo mês de VENCIMENTO da fatura (não pela data da compra),
@@ -3464,6 +3472,7 @@ function renderDistribuicaoMes(chaveMes, totalReceitas){
     itensDaFaturaPara(cart.id, chaveMes).forEach(it => {
       const grupo = it.grupo || CATEGORIA_GRUPO[it.categoria] || 'Essencial';
       somaGrupo[grupo] += it.valor;
+      itensPorGrupo[grupo].push({ nome: it.descricao, valor: it.valor, origemLabel: '💳 '+cart.nome });
     });
   });
 
@@ -3482,16 +3491,30 @@ function renderDistribuicaoMes(chaveMes, totalReceitas){
     const pctUsado = orcamento > 0 ? (val/orcamento)*100 : 0;
     const foraDaMeta = pctUsado > 100;
     const cor = foraDaMeta ? 'var(--terracota)' : 'var(--green)';
+    const expandido = distribuicaoExpandida.has(grupo);
+    const itensOrdenados = itensPorGrupo[grupo].slice().sort((a,b)=> b.valor - a.valor);
     return `
-    <div class="card" style="margin-bottom:10px">
+    <div class="card" style="margin-bottom:10px; cursor:pointer" onclick="toggleDistribuicaoExpandida('${grupo}')">
       <div class="row-between">
         <span style="font-weight:500; font-size:13.5px">${grupo}</span>
         <span class="mono" style="color:${cor}; font-size:13.5px">${pctUsado.toFixed(0)}% da meta</span>
       </div>
       <div class="barra" style="margin-top:8px"><div class="barra-fill" style="width:${Math.min(100,pctUsado)}%; background:${cor}"></div></div>
       <div class="muted" style="margin-top:6px">Orçamento (${meta}% da receita): <span class="mono">${brl(orcamento)}</span></div>
-      <div class="muted" style="margin-top:2px">Gasto no mês: <span class="mono" style="color:${cor}">${brl(val)}</span></div>
+      <div class="row-between" style="margin-top:2px">
+        <span class="muted">Gasto no mês: <span class="mono" style="color:${cor}">${brl(val)}</span></span>
+        ${itensOrdenados.length ? `<span class="cat-seta ${expandido ? 'aberto' : ''}">▾</span>` : ''}
+      </div>
       ${foraDaMeta ? `<div class="muted" style="margin-top:4px; color:var(--terracota)">Passou do orçamento em ${brl(val-orcamento)}</div>` : ''}
+      ${itensOrdenados.length ? `
+      <div class="cat-detalhe ${expandido ? 'aberto' : ''}" style="padding-left:0" onclick="event.stopPropagation()">
+        ${itensOrdenados.map(it => `
+          <div class="cat-detalhe-item">
+            <span class="nome">${it.nome}${it.origemLabel ? ' · '+it.origemLabel : ''}</span>
+            <span class="valor">${brl(it.valor)}</span>
+          </div>
+        `).join('')}
+      </div>` : ''}
     </div>`;
   }).join('');
 }
