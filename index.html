@@ -1252,7 +1252,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
 import {
   getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc,
-  query, orderBy, where, getDocs, serverTimestamp, runTransaction
+  query, orderBy, where, getDocs, serverTimestamp, runTransaction, arrayUnion
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail
@@ -2777,6 +2777,9 @@ window.marcarFaturaComoPaga = async function(){
   if (!confirm(`Marcar fatura de ${brl(total)} como paga, debitando de ${contaObj.nome}?`)) return;
   try{
     await updateDoc(doc(db, 'contas', contaObj.id), { saldo: (contaObj.saldo||0) - total });
+    // registra que essa fatura (por mês de vencimento) já foi paga — evita que o fluxo de caixa projetado
+    // volte a descontar esse valor de novo mais pra frente, já que o dinheiro já saiu de verdade agora
+    await updateDoc(doc(db, 'cartoes', cart.id), { faturasPagas: arrayUnion(chaveFatura) });
     toast(`Fatura paga — ${brl(total)} debitado de ${contaObj.nome}`);
   }catch(err){
     console.error(err);
@@ -3207,18 +3210,24 @@ function construirFluxoCaixaDiario(diasFinalISO){
   despesas.filter(d => !d.pago && d.vencimento >= hojeISO && d.vencimento <= diasFinalISO)
     .forEach(d => somar(d.vencimento, -(d.valor||0)));
 
-  // faturas de cartão: um débito por mês, exatamente no dia de vencimento de cada cartão
+  // faturas de cartão: um débito por mês, exatamente no dia de vencimento de cada cartão.
+  // Se o dia de vencimento já passou mas a fatura ainda não foi marcada como paga, aplica HOJE
+  // (já está vencida — o dinheiro vai sair a qualquer momento, não faz sentido ignorar só porque
+  // a data "oficial" ficou pra trás). Se já foi marcada como paga, pula — o valor já saiu de verdade
+  // e já está refletido no saldo atual das contas.
   const dataFinalObj = new Date(diasFinalISO + 'T00:00:00');
   let dMes = new Date(); dMes.setDate(1);
   while (mesChave(dMes) <= mesChave(dataFinalObj)){
     const chave = mesChave(dMes);
     cartoes.forEach(cart => {
+      if ((cart.faturasPagas||[]).includes(chave)) return; // já paga — não conta de novo
       const total = totalFaturaDe(cart.id, chave);
       if (total > 0){
         const ultimoDiaMes = new Date(dMes.getFullYear(), dMes.getMonth()+1, 0).getDate();
         const diaVenc = Math.min(cart.diaVencimento || 10, ultimoDiaMes);
         const dataVencISO = `${dMes.getFullYear()}-${String(dMes.getMonth()+1).padStart(2,'0')}-${String(diaVenc).padStart(2,'0')}`;
-        if (dataVencISO >= hojeISO && dataVencISO <= diasFinalISO) somar(dataVencISO, -total);
+        const diaAplicar = dataVencISO < hojeISO ? hojeISO : dataVencISO; // vencida e não paga → aplica hoje
+        if (diaAplicar <= diasFinalISO) somar(diaAplicar, -total);
       }
     });
     dMes.setMonth(dMes.getMonth()+1);
