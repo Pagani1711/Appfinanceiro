@@ -298,7 +298,6 @@
     #view-home main{
       display:grid; grid-template-columns:repeat(4, 1fr); column-gap:14px; row-gap:16px; align-items:start;
     }
-    #view-home .acoes-rapidas{ display:none; } /* ações rápidas só fazem sentido no mobile — no desktop tudo já está acessível pela sidebar */
     #view-home .db-block{ margin-bottom:0; margin-top:0 !important; }
     #view-home .db-projecao{ grid-column:1 / -1; }
     #view-home .db-ring{ grid-column:span 1; }
@@ -430,18 +429,6 @@
         <div class="val" id="kpi-saidas">R$ 0,00</div>
         <div class="sub" id="kpi-saidas-sub">no mês</div>
       </div>
-    </div>
-
-    <div class="acoes-rapidas">
-      <button class="acao-btn" onclick="mudarView('contas'); setTimeout(abrirFormDespesa, 150)">
-        <span class="acao-icone">+</span>Despesa
-      </button>
-      <button class="acao-btn" onclick="mudarView('investimentos'); setTimeout(abrirFormInvestimento, 150)">
-        <span class="acao-icone">+</span>Investir
-      </button>
-      <button class="acao-btn" onclick="mudarView('cartoes')">
-        <span class="acao-icone">↑</span>Fatura
-      </button>
     </div>
 
     <div class="db-block db-projecao">
@@ -3044,7 +3031,8 @@ function renderFatura(){
           <div class="despesa-sub">${formatarData(it.data)} · ${it.categoria}${it.parcelaTotal>1 ? ' · '+it.parcelaAtual+'/'+it.parcelaTotal : ''}${it.tipo==='Fixa' ? ' · Fixa/Assinatura' : ''}${!it.real ? ' · projeção' : ''}</div>
         </div>
         <div class="despesa-valor" style="color:var(--terracota)">${brl(it.valor)}</div>
-        ${it.real ? `<button class="del-btn" onclick="abrirFormLancamento('${it.origemId}')">✏️</button><button class="del-btn" onclick="excluirLancamento('${it.origemId}')">✕</button>` : `<span class="muted" style="font-size:11px">futuro</span>`}
+        <button class="del-btn" onclick="abrirFormLancamento('${it.origemId}')">✏️</button><button class="del-btn" onclick="excluirLancamento('${it.origemId}')">✕</button>
+        ${!it.real ? `<span class="muted" style="font-size:11px; width:100%; text-align:right">futuro</span>` : ''}
       </div>
     `).join('');
   }
@@ -3085,7 +3073,11 @@ window.salvarLancamento = async function(e){
 };
 
 window.excluirLancamento = async function(id){
-  if (!confirm('Excluir este lançamento?')) return;
+  const l = lancamentosCartao.find(x => x.id === id);
+  const avisoSerie = (l && (l.tipo === 'Fixa' || l.parcelaTotal > 1))
+    ? ' Esse lançamento se repete em outros meses (fixa/parcelado) — excluir remove a série inteira, incluindo os meses passados e futuros.'
+    : '';
+  if (!confirm('Excluir este lançamento?' + avisoSerie)) return;
   await deleteDoc(doc(db, 'lancamentosCartao', id));
   toast('Lançamento excluído');
 };
@@ -3651,10 +3643,16 @@ function renderDistribuicaoMes(chaveMes, totalReceitas){
   }).join('');
 }
 
+// Nome de exibição por prefixo de e-mail — cobre o caso do e-mail juntar nome+sobrenome
+// (ex: "fernandopagani@..."), onde não dá pra separar automaticamente. Se um novo usuário aparecer
+// e não estiver aqui, cai no fallback (prefixo do e-mail capitalizado).
+const NOMES_EXIBICAO = { 'fernandopagani': 'Fernando' };
+
 function nomeUsuarioAtual(){
   if (!usuarioAtual) return '';
   if (usuarioAtual.displayName) return usuarioAtual.displayName;
   const prefixo = (usuarioAtual.email||'').split('@')[0];
+  if (NOMES_EXIBICAO[prefixo]) return NOMES_EXIBICAO[prefixo];
   return prefixo.charAt(0).toUpperCase() + prefixo.slice(1);
 }
 
