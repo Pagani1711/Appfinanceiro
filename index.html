@@ -1871,8 +1871,8 @@ window.confirmarExclusaoParcial = async function(escopo){
   const { colecaoNome, id, recorrenciaId, campoData, dataReferencia, labelSingular } = exclusaoSeriePendente;
   fecharForm('overlay-excluir-serie');
   exclusaoSeriePendente = null;
-  const listaAtual = colecaoNome === 'despesas' ? despesas : entradas;
-  const labelPlural = colecaoNome === 'despesas' ? 'despesa' : 'receita';
+  const listaAtual = colecaoNome === 'despesas' ? despesas : colecaoNome === 'entradas' ? entradas : lancamentosCartao;
+  const labelPlural = colecaoNome === 'despesas' ? 'despesa' : colecaoNome === 'entradas' ? 'receita' : 'lançamento';
   try{
     if (escopo === 'este'){
       await deleteDoc(doc(db, colecaoNome, id));
@@ -2837,15 +2837,9 @@ function itensDaFaturaPara(cartaoId, chaveFatura){
           });
         }
       }
-    } else if (l.tipo === 'Fixa'){
-      // assinatura/fixa — repete todo mês pra sempre, a partir do mês de origem
-      if (chaveFatura >= mesBase){
-        itens.push({
-          origemId: l.id, real: chaveFatura === mesBase, descricao: l.descricao, categoria: l.categoria,
-          data: l.data, valor: valorParcelaDe(l), parcelaAtual: 1, parcelaTotal: 1, tipo: l.tipo, grupo: l.grupo
-        });
-      }
     } else {
+      // avulsa OU fixa/assinatura já materializada (um documento real por mês) — cada uma mapeia
+      // pro seu próprio mês de vencimento, sem projetar nada virtualmente pra outros meses
       if (mesBase === chaveFatura){
         itens.push({
           origemId: l.id, real: true, descricao: l.descricao, categoria: l.categoria,
@@ -3056,6 +3050,19 @@ window.salvarLancamento = async function(e){
         descricao, valor, valorParcela, data, categoria, tipo, grupo, parcelaAtual, parcelaTotal
       });
       toast('Lançamento atualizado!');
+    } else if (tipo === 'Fixa' && parcelaTotal <= 1){
+      // assinatura/fixa nova — materializa um documento REAL por mês (igual despesa/receita fixa),
+      // pra que editar um mês específico depois não afete os outros
+      const recorrenciaId = 'r' + Date.now() + Math.random().toString(36).slice(2,8);
+      recorrenciasEmExtensao.add(recorrenciaId);
+      try{
+        const dadosBase = { cartaoId: cartaoAbertoId, descricao, valor, valorParcela, data, categoria, tipo, grupo, parcelaAtual:1, parcelaTotal:1, userId: usuarioAtual.uid };
+        await addDoc(collection(db, 'lancamentosCartao'), { ...dadosBase, recorrenciaId, criadoEm: serverTimestamp() });
+        await gerarRecorrencia('lancamentosCartao', { ...dadosBase, recorrenciaId }, 'data', MESES_RECORRENCIA);
+      } finally {
+        recorrenciasEmExtensao.delete(recorrenciaId);
+      }
+      toast('Lançamento salvo — vai se repetir todo mês automaticamente, sem limite.');
     } else {
       await addDoc(collection(db, 'lancamentosCartao'), {
         cartaoId: cartaoAbertoId, descricao, valor, valorParcela, data, categoria, tipo, grupo, parcelaAtual, parcelaTotal,
@@ -3074,13 +3081,45 @@ window.salvarLancamento = async function(e){
 
 window.excluirLancamento = async function(id){
   const l = lancamentosCartao.find(x => x.id === id);
-  const avisoSerie = (l && (l.tipo === 'Fixa' || l.parcelaTotal > 1))
+  if (!l) return;
+
+  if (l.recorrenciaId){
+    abrirDialogoExclusaoSerie('lancamentosCartao', l, 'data', 'lançamento');
+    return;
+  }
+
+  // ainda sem recorrenciaId (parcelamento fixo antigo, ou fatura de assinatura ainda não migrada) —
+  // é um documento único representando tudo, então excluir remove a série inteira de uma vez
+  const avisoSerie = (l.tipo === 'Fixa' || l.parcelaTotal > 1)
     ? ' Esse lançamento se repete em outros meses (fixa/parcelado) — excluir remove a série inteira, incluindo os meses passados e futuros.'
     : '';
   if (!confirm('Excluir este lançamento?' + avisoSerie)) return;
   await deleteDoc(doc(db, 'lancamentosCartao', id));
   toast('Lançamento excluído');
 };
+
+// Migra lançamentos de cartão "Fixa" antigos (um documento único repetido virtualmente pra sempre,
+// sem recorrenciaId) pro mesmo modelo já usado em despesas/receitas fixas: materializa um documento
+// REAL por mês a partir de agora. A partir da migração, cada mês passa a ser editável/excluível de
+// forma independente — editar Setembro não volta a mexer em Outubro (e vice-versa).
+async function migrarLancamentosFixosCartao(){
+  const legados = lancamentosCartao.filter(l => l.tipo === 'Fixa' && (!l.parcelaTotal || l.parcelaTotal <= 1) && !l.recorrenciaId);
+  for (const l of legados){
+    if (recorrenciasEmExtensao.has(l.id)) continue;
+    recorrenciasEmExtensao.add(l.id);
+    try{
+      const recorrenciaId = 'r' + Date.now() + Math.random().toString(36).slice(2,8);
+      await updateDoc(doc(db, 'lancamentosCartao', l.id), { recorrenciaId });
+      const dadosBase = { ...l, recorrenciaId };
+      delete dadosBase.id;
+      await gerarRecorrencia('lancamentosCartao', dadosBase, 'data', MESES_RECORRENCIA);
+    }catch(err){
+      console.error('Erro ao migrar lançamento fixo de cartão:', err);
+    } finally {
+      recorrenciasEmExtensao.delete(l.id);
+    }
+  }
+}
 
 // Importação de extrato (.csv ou .xlsx) — best effort: tenta identificar colunas de data/descrição/valor
 window.importarExtrato = async function(event){
@@ -3760,6 +3799,8 @@ function iniciarListeners(uid){
     renderCartoes();
     if (cartaoAbertoId) renderFatura();
     renderDespesas();
+    migrarLancamentosFixosCartao();
+    manterRecorrenciasEmDia(lancamentosCartao, 'lancamentosCartao', 'data');
   }, err => console.error('lancamentosCartao:', err)));
 }
 
