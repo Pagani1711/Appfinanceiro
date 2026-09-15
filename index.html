@@ -3106,9 +3106,13 @@ async function migrarLancamentosFixosCartao(){
   const legados = lancamentosCartao.filter(l => l.tipo === 'Fixa' && (!l.parcelaTotal || l.parcelaTotal <= 1) && !l.recorrenciaId);
   for (const l of legados){
     if (recorrenciasEmExtensao.has(l.id)) continue;
+    const recorrenciaId = 'r' + Date.now() + Math.random().toString(36).slice(2,8);
+    // trava tanto pelo id original quanto pelo novo recorrenciaId — a auto-extensão (manterRecorrenciasEmDia)
+    // verifica pelo recorrenciaId, então sem isso ela não via essa migração em andamento e gerava os
+    // mesmos meses de novo, duplicando tudo
     recorrenciasEmExtensao.add(l.id);
+    recorrenciasEmExtensao.add(recorrenciaId);
     try{
-      const recorrenciaId = 'r' + Date.now() + Math.random().toString(36).slice(2,8);
       await updateDoc(doc(db, 'lancamentosCartao', l.id), { recorrenciaId });
       const dadosBase = { ...l, recorrenciaId };
       delete dadosBase.id;
@@ -3117,6 +3121,7 @@ async function migrarLancamentosFixosCartao(){
       console.error('Erro ao migrar lançamento fixo de cartão:', err);
     } finally {
       recorrenciasEmExtensao.delete(l.id);
+      recorrenciasEmExtensao.delete(recorrenciaId);
     }
   }
 }
@@ -3841,6 +3846,30 @@ window.migrarDadosAntigos = async function(){
     }
   }
   console.log(`Migração concluída: ${totalMigrado} documento(s) atualizados com userId = ${usuarioAtual.uid}`);
+};
+
+// Remove lançamentos de cartão duplicados (mesmo cartão + descrição + data + valor + tipo) — corrige o
+// efeito da corrida entre migração e auto-extensão que gerava os mesmos meses duas vezes. Rode uma vez
+// pelo console do navegador, logado como o usuário afetado: limparLancamentosCartaoDuplicados()
+window.limparLancamentosCartaoDuplicados = async function(){
+  if (!usuarioAtual){ console.warn('Faça login primeiro.'); return; }
+  const snap = await getDocs(query(collection(db, 'lancamentosCartao'), where('userId','==',usuarioAtual.uid)));
+  const todos = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+  const grupos = {};
+  todos.forEach(l => {
+    const chave = [l.cartaoId, l.descricao, l.data, l.valor, l.tipo].join('|');
+    (grupos[chave] = grupos[chave] || []).push(l);
+  });
+  let totalRemovidos = 0;
+  for (const itens of Object.values(grupos)){
+    if (itens.length <= 1) continue;
+    const ordenados = itens.slice().sort((a,b) => (a.criadoEm?.seconds||0) - (b.criadoEm?.seconds||0));
+    for (const dup of ordenados.slice(1)){ // mantém o mais antigo, remove o resto
+      await deleteDoc(doc(db, 'lancamentosCartao', dup.id));
+      totalRemovidos++;
+    }
+  }
+  console.log(`Limpeza concluída: ${totalRemovidos} lançamento(s) duplicado(s) removido(s).`);
 };
 
 renderDespesas();
