@@ -716,9 +716,9 @@
         <button class="btn-outline small" style="padding:13px" onclick="document.getElementById('input-extrato').click()">⇪ Importar extrato</button>
         <button class="btn-outline small" style="padding:13px" onclick="abrirFormLancamento()">＋ Lançamento manual</button>
       </div>
-      <div class="btn-row" style="margin-bottom:6px">
+      <div class="btn-row" style="margin-bottom:6px" id="fatura-acoes-pagamento">
         <button class="btn-outline small" style="padding:13px" onclick="fecharFaturaAtual()">🔒 Fechar fatura</button>
-        <button class="btn btn-primary" style="padding:13px; font-size:13px" onclick="marcarFaturaComoPaga()">✓ Marcar como paga</button>
+        <button class="btn btn-primary" style="padding:13px; font-size:13px" id="btn-marcar-paga" onclick="marcarFaturaComoPaga()">✓ Marcar como paga</button>
       </div>
       <input type="file" id="input-extrato" accept=".csv,.xlsx,.xls" style="display:none" onchange="importarExtrato(event)">
 
@@ -2957,6 +2957,26 @@ function renderFatura(){
   document.getElementById('fatura-mes-label').textContent = NOMES_MES[mesRef.getMonth()] + '/' + mesRef.getFullYear();
   document.getElementById('fatura-fechamento-info').textContent =
     `Fecha dia ${diaFechamentoEm(cart, new Date().toISOString().slice(0,10))} (atual) · Vence ${cart.diaVencimento}/${String(mesFatura.getMonth()+1).padStart(2,'0')} (${NOMES_MES[mesFatura.getMonth()]})`;
+
+  // Mostra claramente se ESSA fatura (por mês de vencimento) já foi marcada como paga — evita clicar
+  // duas vezes sem perceber (o que debitaria o valor em dobro da conta) e ajuda a conferir se o app
+  // realmente registrou o pagamento
+  const jaPaga = (cart.faturasPagas||[]).includes(chaveFatura);
+  const acoesEl = document.getElementById('fatura-acoes-pagamento');
+  const btnPagaEl = document.getElementById('btn-marcar-paga');
+  if (jaPaga){
+    acoesEl.style.opacity = '.6';
+    btnPagaEl.textContent = '✓ Fatura já paga';
+    btnPagaEl.disabled = true;
+    btnPagaEl.style.cursor = 'default';
+    btnPagaEl.onclick = null;
+  } else {
+    acoesEl.style.opacity = '1';
+    btnPagaEl.textContent = '✓ Marcar como paga';
+    btnPagaEl.disabled = false;
+    btnPagaEl.style.cursor = 'pointer';
+    btnPagaEl.onclick = marcarFaturaComoPaga;
+  }
 
   const itensFatura = itensDaFaturaPara(cart.id, chaveFatura).sort((a,b)=> (b.data||'').localeCompare(a.data||''));
   const totalFatura = itensFatura.reduce((s,it)=> s + it.valor, 0);
