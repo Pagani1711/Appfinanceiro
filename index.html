@@ -2761,7 +2761,10 @@ window.marcarFaturaComoPaga = async function(){
   if (total <= 0){ toast('Nada a pagar nesta fatura'); return; }
   const contaObj = contas.find(c => c.id === cart.contaPagamentoId);
   if (!contaObj){ toast('Conta de pagamento não encontrada'); return; }
-  if (!confirm(`Marcar fatura de ${brl(total)} como paga, debitando de ${contaObj.nome}?`)) return;
+  // confirmação mostra a data de vencimento REAL por extenso, não só o rótulo da tela (que é o mês de
+  // referência, um mês antes do vencimento) — pra evitar marcar a fatura errada como paga
+  const vencimentoTexto = `${cart.diaVencimento}/${String(mesFatura.getMonth()+1).padStart(2,'0')}/${mesFatura.getFullYear()} (${NOMES_MES[mesFatura.getMonth()]})`;
+  if (!confirm(`Marcar fatura de ${brl(total)} como paga, debitando de ${contaObj.nome}?\n\nVencimento real: ${vencimentoTexto}`)) return;
   try{
     await updateDoc(doc(db, 'contas', contaObj.id), { saldo: (contaObj.saldo||0) - total });
     // registra que essa fatura (por mês de vencimento) já foi paga — evita que o fluxo de caixa projetado
