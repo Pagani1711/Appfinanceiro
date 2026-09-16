@@ -720,6 +720,9 @@
         <button class="btn-outline small" style="padding:13px" onclick="fecharFaturaAtual()">🔒 Fechar fatura</button>
         <button class="btn btn-primary" style="padding:13px; font-size:13px" id="btn-marcar-paga" onclick="marcarFaturaComoPaga()">✓ Marcar como paga</button>
       </div>
+      <div style="text-align:center; margin-bottom:14px">
+        <a href="#" id="link-marcar-paga-sem-debito" onclick="return marcarFaturaPagaSemDebito()" style="color:var(--ink-soft); font-size:11.5px; text-decoration:underline">Já paguei fora do app — só marcar como paga (sem debitar de novo)</a>
+      </div>
       <input type="file" id="input-extrato" accept=".csv,.xlsx,.xls" style="display:none" onchange="importarExtrato(event)">
 
       <div class="mov-cols">
@@ -2777,6 +2780,28 @@ window.marcarFaturaComoPaga = async function(){
   }
 };
 
+// Pra quando o pagamento já saiu da conta fora do app (débito automático, PIX manual etc.) e o saldo
+// da conta já foi atualizado por fora — só registra que a fatura está paga, sem debitar de novo.
+window.marcarFaturaPagaSemDebito = function(){
+  const cart = cartoes.find(c => c.id === cartaoAbertoId);
+  if (!cart) return;
+  const chaveFatura = mesChave(mesFatura);
+  const total = totalFaturaDe(cart.id, chaveFatura);
+  if (total <= 0){ toast('Nada a pagar nesta fatura'); return false; }
+  const vencimentoTexto = `${cart.diaVencimento}/${String(mesFatura.getMonth()+1).padStart(2,'0')}/${mesFatura.getFullYear()} (${NOMES_MES[mesFatura.getMonth()]})`;
+  if (!confirm(`Marcar fatura de ${brl(total)} (vencimento real: ${vencimentoTexto}) como paga SEM debitar de novo da conta — confirma que o valor já saiu por fora do app?`)) return false;
+  (async () => {
+    try{
+      await updateDoc(doc(db, 'cartoes', cart.id), { faturasPagas: arrayUnion(chaveFatura) });
+      toast('Fatura marcada como paga — saldo da conta não foi alterado');
+    }catch(err){
+      console.error(err);
+      toast('Erro ao marcar como paga. Veja o console.');
+    }
+  })();
+  return false;
+};
+
 window.excluirCartao = async function(id){
   if (!confirm('Excluir este cartão? Os lançamentos vinculados continuarão salvos, mas ficarão órfãos.')) return;
   await deleteDoc(doc(db, 'cartoes', id));
@@ -2967,18 +2992,21 @@ function renderFatura(){
   const jaPaga = (cart.faturasPagas||[]).includes(chaveFatura);
   const acoesEl = document.getElementById('fatura-acoes-pagamento');
   const btnPagaEl = document.getElementById('btn-marcar-paga');
+  const linkSemDebitoEl = document.getElementById('link-marcar-paga-sem-debito');
   if (jaPaga){
     acoesEl.style.opacity = '.6';
     btnPagaEl.textContent = '✓ Fatura já paga';
     btnPagaEl.disabled = true;
     btnPagaEl.style.cursor = 'default';
     btnPagaEl.onclick = null;
+    linkSemDebitoEl.style.display = 'none';
   } else {
     acoesEl.style.opacity = '1';
     btnPagaEl.textContent = '✓ Marcar como paga';
     btnPagaEl.disabled = false;
     btnPagaEl.style.cursor = 'pointer';
     btnPagaEl.onclick = marcarFaturaComoPaga;
+    linkSemDebitoEl.style.display = '';
   }
 
   const itensFatura = itensDaFaturaPara(cart.id, chaveFatura).sort((a,b)=> (b.data||'').localeCompare(a.data||''));
