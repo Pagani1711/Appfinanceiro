@@ -2064,6 +2064,12 @@ function renderDespesas(){
 // Projeção de receitas x despesas do mês sendo visualizado (inclusive meses futuros)
 // Saldo acumulado projetado até o fim de um mês específico, partindo do saldo atual em contas
 // (mês atual: só considera o que ainda falta receber/pagar; meses futuros: soma tudo, mês a mês, encadeado)
+// Soma as faturas de cartão pendentes de um mês, pulando qualquer uma já marcada como paga
+// (via "Marcar como paga" ou "Já paguei fora do app") — evita contar de novo o que já saiu da conta.
+function totalFaturasPendentesEm(chave){
+  return cartoes.reduce((s,c)=> s + ((c.faturasPagas||[]).includes(chave) ? 0 : totalFaturaDe(c.id, chave)), 0);
+}
+
 function projecaoSaldoAteMes(dataMes){
   const chaveHoje = mesChave(new Date());
   const chaveAlvo = mesChave(dataMes);
@@ -2072,7 +2078,7 @@ function projecaoSaldoAteMes(dataMes){
 
   const despesasPendentesHoje = despesas.filter(d => (d.vencimento||'').startsWith(chaveHoje) && !d.pago).reduce((s,d)=>s+(d.valor||0),0);
   const receitasPendentesHoje = entradas.filter(en => (en.data||'').startsWith(chaveHoje) && !en.recebido).reduce((s,en)=>s+(en.valor||0),0);
-  const faturaHoje = cartoes.reduce((s,c)=> s + totalFaturaDe(c.id, chaveHoje), 0);
+  const faturaHoje = totalFaturasPendentesEm(chaveHoje);
   saldo += receitasPendentesHoje - despesasPendentesHoje - faturaHoje;
   if (chaveAlvo === chaveHoje) return saldo;
 
@@ -2081,7 +2087,7 @@ function projecaoSaldoAteMes(dataMes){
     const chave = mesChave(d);
     const desp = despesas.filter(x => (x.vencimento||'').startsWith(chave)).reduce((s,x)=>s+(x.valor||0),0);
     const rec = entradas.filter(x => (x.data||'').startsWith(chave)).reduce((s,x)=>s+(x.valor||0),0);
-    const fat = cartoes.reduce((s,c)=> s + totalFaturaDe(c.id, chave), 0);
+    const fat = totalFaturasPendentesEm(chave); // meses futuros: nada ali foi pago ainda, mas usa o mesmo helper por consistência
     saldo += rec - desp - fat;
     d.setMonth(d.getMonth()+1);
   }
@@ -3436,7 +3442,7 @@ function renderProjecaoFluxoCaixa(){
   const chaveHoje = mesChave(hoje);
   const despesasPendentesHoje = despesas.filter(d => (d.vencimento||'').startsWith(chaveHoje) && !d.pago).reduce((s,d)=>s+(d.valor||0),0);
   const receitasPendentesHoje = entradas.filter(en => (en.data||'').startsWith(chaveHoje) && !en.recebido).reduce((s,en)=>s+(en.valor||0),0);
-  const faturaPendenteHoje = cartoes.reduce((s,c)=> s + totalFaturaDe(c.id, chaveHoje), 0);
+  const faturaPendenteHoje = totalFaturasPendentesEm(chaveHoje);
   const saldoPendenteMesAtual = receitasPendentesHoje - despesasPendentesHoje - faturaPendenteHoje;
 
   let cumulativo = saldoContasAtual;
