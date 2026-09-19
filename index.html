@@ -20,6 +20,7 @@
     --gold-soft:#F0EBDD;
     --line:#E8E6DF;
     --sidebar-w:232px;
+    --rail-w:56px;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{margin:0; padding:0; background:var(--navy);}
@@ -272,29 +273,41 @@
   .donut-total{ display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--line); margin-top:12px; padding-top:12px; font-weight:600; font-size:13px; }
   .donut-total .mono{ font-weight:500; font-size:14px; }
 
-  /* ---------- Sidebar (desktop only) ---------- */
+  /* ---------- Sidebar retrátil (desktop only): fechada = só o botão de 3 traços; aberta = menu sobre o conteúdo ---------- */
   nav.side-nav{
-    display:none; position:fixed; left:0; top:0; width:var(--sidebar-w); height:100vh;
-    background:var(--navy); color:#fff; padding:26px 18px; z-index:60;
-    flex-direction:column;
+    display:none; position:fixed; left:0; top:0; width:var(--rail-w); height:100vh;
+    background:var(--navy); color:#fff; padding:14px 8px; z-index:60;
+    flex-direction:column; overflow:hidden; transition:width .2s ease, box-shadow .2s ease;
   }
-  nav.side-nav .brand{ display:flex; align-items:center; gap:10px; margin-bottom:34px; padding:0 4px; }
+  nav.side-nav .side-topo{ display:flex; align-items:center; gap:10px; height:40px; margin-bottom:26px; flex-shrink:0; }
+  nav.side-nav .side-toggle{
+    width:40px; height:40px; flex-shrink:0; border:none; border-radius:10px; background:transparent; color:#fff;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  nav.side-nav .side-toggle:hover{ background:var(--navy-mid); }
+  nav.side-nav .side-toggle svg{ width:22px; height:22px; }
+  nav.side-nav .brand{ display:flex; align-items:center; gap:10px; white-space:nowrap; }
   nav.side-nav .brand-mark{ width:30px; height:30px; border-radius:8px; background:var(--gold); flex-shrink:0; }
   nav.side-nav .brand-name{ font-weight:600; font-size:16px; }
   nav.side-nav .side-nav-links{ display:flex; flex-direction:column; gap:2px; }
+  nav.side-nav .brand, nav.side-nav .side-nav-links{ opacity:0; visibility:hidden; transition:opacity .15s ease; }
   nav.side-nav a{
-    display:flex; align-items:center; gap:12px; padding:11px 12px; border-radius:10px;
+    display:flex; align-items:center; gap:12px; padding:11px 12px; border-radius:10px; white-space:nowrap;
     color:#B6BBCE; text-decoration:none; font-size:14px; font-weight:500; cursor:pointer;
   }
   nav.side-nav a svg{ width:17px; height:17px; opacity:.85; flex-shrink:0; }
   nav.side-nav a.active{ background:var(--navy-mid); color:#fff; }
   nav.side-nav a.active svg{ opacity:1; }
+  .side-backdrop{ display:none; position:fixed; inset:0; background:rgba(46,54,72,.35); z-index:55; }
 
   /* ---------- Desktop layout (≥960px) ---------- */
   @media (min-width:960px){
-    body{ max-width:none; margin:0; padding-left:var(--sidebar-w); padding-bottom:0; }
+    body{ max-width:none; margin:0; padding-left:var(--rail-w); padding-bottom:0; }
     nav.bottom-nav{ display:none; }
     nav.side-nav{ display:flex; }
+    body.menu-aberto nav.side-nav{ width:var(--sidebar-w); box-shadow:8px 0 32px rgba(46,54,72,.28); }
+    body.menu-aberto nav.side-nav .brand, body.menu-aberto nav.side-nav .side-nav-links{ opacity:1; visibility:visible; }
+    body.menu-aberto .side-backdrop{ display:block; }
     .toast{ bottom:26px; }
 
     main{ max-width:1320px; margin:0 auto; padding:34px 40px 60px; }
@@ -335,11 +348,10 @@
 
     /* ---- Início: coluna principal + coluna lateral (rola junto com a página) ---- */
     #view-home.active{
-      display:grid; grid-template-columns:minmax(0,1fr) 360px; column-gap:20px; row-gap:16px; align-items:start;
-      max-width:1320px; margin:0 auto; padding:34px 40px 60px;
+      display:grid; grid-template-columns:minmax(0,1fr) clamp(320px, 22vw, 440px); column-gap:20px; row-gap:16px; align-items:start;
+      max-width:none; margin:0; padding:28px 32px 56px;
     }
     #view-home main{ display:contents; }
-    @media (max-width:1439px){ #view-home.active{ grid-template-columns:minmax(0,1fr) 320px; } }
     #view-home header.app-header{ grid-column:1; grid-row:1; margin-bottom:0; padding-bottom:0; border-bottom:none; }
     #view-home .db-quote{ grid-column:2; grid-row:1; }
     #view-home .db-quote .section-title{ margin-top:0; }
@@ -351,7 +363,15 @@
     #view-home .db-donuts{ grid-column:1 / -1; grid-row:4; display:block; }
     #view-home .kpi-strip{ margin-bottom:0; gap:12px; }
     #view-home .proj-meses-cards{ grid-template-columns:repeat(auto-fit, minmax(235px, 1fr)); }
-    @media (max-width:1439px){ #view-home .proj-kpis{ grid-template-columns:1fr 1fr; } }
+    @media (max-width:1199px){
+      #view-home .proj-kpis{ grid-template-columns:1fr 1fr; }
+      /* telas menores: uma coluna só (lateral vem depois da principal) */
+      #view-home.active{ grid-template-columns:minmax(0,1fr); }
+      #view-home header.app-header, #view-home .db-quote, #view-home .home-col-main, #view-home .home-col-side,
+      #view-home .db-distribuicao, #view-home .db-comparativo, #view-home .db-donuts{ grid-column:1; grid-row:auto; }
+      #view-home header.app-header{ order:1; } #view-home .db-quote{ order:2; } #view-home .home-col-main{ order:3; }
+      #view-home .home-col-side{ order:4; } #view-home .db-distribuicao{ order:5; } #view-home .db-comparativo{ order:6; } #view-home .db-donuts{ order:7; }
+    }
     #view-home .kpi-tile{ padding:16px 16px; }
     #view-home .kpi-tile .val{ font-size:clamp(14px, 1.2vw, 19px); white-space:nowrap; }
     #view-home .db-block{ margin-bottom:0; margin-top:0 !important; }
@@ -426,10 +446,16 @@
 <div id="app-root" style="display:none">
 
 <!-- ===== SIDEBAR (desktop only, ≥960px) ===== -->
-<nav class="side-nav">
-  <div class="brand">
-    <div class="brand-mark"></div>
-    <div class="brand-name">AppFinanceiro</div>
+<div class="side-backdrop" onclick="fecharMenuLateral()"></div>
+<nav class="side-nav" id="side-nav">
+  <div class="side-topo">
+    <button class="side-toggle" id="side-toggle" onclick="toggleMenuLateral()" aria-label="Abrir menu" aria-expanded="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></svg>
+    </button>
+    <div class="brand">
+      <div class="brand-mark"></div>
+      <div class="brand-name">AppFinanceiro</div>
+    </div>
   </div>
   <div class="side-nav-links">
     <a data-view="home" class="active" onclick="mudarView('home')">
@@ -1359,7 +1385,18 @@ const categoriaExpandida = { home: new Set(), fatura: new Set() }; // categorias
 const distribuicaoExpandida = new Set(); // grupos (Essencial/Lazer/Investimento) com o detalhe aberto no card "Distribuição do mês"
 
 // ---------- Navegação ----------
+window.toggleMenuLateral = function(){
+  const aberto = document.body.classList.toggle('menu-aberto');
+  const btn = document.getElementById('side-toggle');
+  if (btn){ btn.setAttribute('aria-expanded', aberto ? 'true' : 'false'); btn.setAttribute('aria-label', aberto ? 'Fechar menu' : 'Abrir menu'); }
+};
+window.fecharMenuLateral = function(){
+  if (document.body.classList.contains('menu-aberto')) toggleMenuLateral();
+};
+document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharMenuLateral(); });
+
 window.mudarView = function(nome){
+  fecharMenuLateral();
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-'+nome).classList.add('active');
   document.querySelectorAll('.bottom-nav button').forEach(b => b.classList.toggle('active', b.dataset.view === nome));
@@ -3377,11 +3414,14 @@ function coletarEventosFluxoCaixa(diasFinalISO){
   const hojeISO = new Date().toISOString().slice(0,10);
   const eventos = [];
 
-  // só conta o que ainda está PENDENTE — o que já foi pago/recebido já está refletido no saldo atual das contas
-  entradas.filter(en => !en.recebido && en.data >= hojeISO && en.data <= diasFinalISO)
-    .forEach(en => eventos.push({ data: en.data, valor: en.valor||0, contaId: en.contaId||null }));
-  despesas.filter(d => !d.pago && d.vencimento >= hojeISO && d.vencimento <= diasFinalISO)
-    .forEach(d => eventos.push({ data: d.vencimento, valor: -(d.valor||0), contaId: d.contaId||null }));
+  // só conta o que ainda está PENDENTE — o que já foi pago/recebido já está refletido no saldo atual das contas.
+  // Item pendente do mês atual com data ANTERIOR a hoje (atrasado / ainda não marcado como pago ou recebido) continua
+  // valendo pro caixa: entra HOJE, igual à fatura vencida — é a mesma regra da "Projeção fim do mês" (todo pendente do mês).
+  const inicioMesISO = hojeISO.slice(0,8) + '01';
+  entradas.filter(en => !en.recebido && (en.data||'') >= inicioMesISO && en.data <= diasFinalISO)
+    .forEach(en => eventos.push({ data: en.data < hojeISO ? hojeISO : en.data, valor: en.valor||0, contaId: en.contaId||null, atrasado: en.data < hojeISO }));
+  despesas.filter(d => !d.pago && (d.vencimento||'') >= inicioMesISO && d.vencimento <= diasFinalISO)
+    .forEach(d => eventos.push({ data: d.vencimento < hojeISO ? hojeISO : d.vencimento, valor: -(d.valor||0), contaId: d.contaId||null, atrasado: d.vencimento < hojeISO }));
 
   // faturas de cartão: um débito por mês, exatamente no dia de vencimento de cada cartão.
   // Se o dia de vencimento já passou mas a fatura ainda não foi marcada como paga, aplica HOJE
@@ -3400,7 +3440,7 @@ function coletarEventosFluxoCaixa(diasFinalISO){
         const diaVenc = Math.min(cart.diaVencimento || 10, ultimoDiaMes);
         const dataVencISO = `${dMes.getFullYear()}-${String(dMes.getMonth()+1).padStart(2,'0')}-${String(diaVenc).padStart(2,'0')}`;
         const diaAplicar = dataVencISO < hojeISO ? hojeISO : dataVencISO; // vencida e não paga → aplica hoje
-        if (diaAplicar <= diasFinalISO) eventos.push({ data: diaAplicar, valor: -total, contaId: cart.contaPagamentoId||null });
+        if (diaAplicar <= diasFinalISO) eventos.push({ data: diaAplicar, valor: -total, contaId: cart.contaPagamentoId||null, atrasado: dataVencISO < hojeISO });
       }
     });
     dMes.setMonth(dMes.getMonth()+1);
@@ -3514,6 +3554,8 @@ function construirFluxoCaixaPorConta(diasFinalISO){
     alvo.deltas[ev.data] = (alvo.deltas[ev.data]||0) + ev.valor;
   });
   if (usaSemConta) itens.push(semConta);
+  const atrasados = { receber: 0, pagar: 0 };
+  eventos.filter(ev => ev.atrasado).forEach(ev => { if (ev.valor > 0) atrasados.receber += ev.valor; else atrasados.pagar += -ev.valor; });
 
   const datas = [];
   const fim = new Date(diasFinalISO + 'T00:00:00');
@@ -3524,7 +3566,7 @@ function construirFluxoCaixaPorConta(diasFinalISO){
     let acc = it.saldoInicial;
     it.serie = datas.map(iso => { acc += (it.deltas[iso]||0); return acc; });
   });
-  return { datas, itens };
+  return { datas, itens, atrasados };
 }
 
 // Curva suave (spline cúbica monotônica, Fritsch–Carlson): passa por todos os pontos sem "estourar" além
@@ -3586,7 +3628,7 @@ function renderGraficoFluxoCaixaMes(){
 
   const hoje = new Date();
   const fimISO = new Date(hoje.getFullYear(), hoje.getMonth()+1, 0).toISOString().slice(0,10);
-  const { datas, itens } = construirFluxoCaixaPorConta(fimISO);
+  const { datas, itens, atrasados } = construirFluxoCaixaPorConta(fimISO);
   const n = datas.length;
   const visiveis = itens.filter(it => !contasFluxoOcultas.has(it.id));
   const total = datas.map((_,i) => visiveis.reduce((s,it)=> s + it.serie[i], 0));
@@ -3682,7 +3724,13 @@ function renderGraficoFluxoCaixaMes(){
       <div class="mono" style="font-weight:500; font-size:13px; color:${negativo ? 'var(--terracota)' : 'var(--ink)'}">${brl(total[idxMin])} em ${formatarData(datas[idxMin])}</div>
     </div>`;
 
-  el.innerHTML = `<div class="fluxo-card-inner">${cabecalho(menorTxt)}<div class="fluxo-corpo"><div class="fluxo-svg-wrap">${svg}</div>${painel}</div></div>`;
+  const partesNota = [];
+  if (atrasados.receber > 0) partesNota.push(`${brl(atrasados.receber)} a receber`);
+  if (atrasados.pagar > 0) partesNota.push(`${brl(atrasados.pagar)} a pagar`);
+  const nota = partesNota.length
+    ? `<div class="muted" style="margin-top:10px; font-size:11px; line-height:1.5">Contas do mês com data anterior a hoje e ainda não marcadas como pagas/recebidas entram no dia de hoje: ${partesNota.join(' e ')}.</div>`
+    : '';
+  el.innerHTML = `<div class="fluxo-card-inner">${cabecalho(menorTxt)}<div class="fluxo-corpo"><div class="fluxo-svg-wrap">${svg}</div>${painel}</div>${nota}</div>`;
 
   // --- interação: linha vertical + tooltip com o total e o saldo de cada conta marcada ---
   const overlay = el.querySelector('#fluxo-overlay');
@@ -4179,6 +4227,7 @@ window.fazerLogin = async function(e){
 };
 
 window.fazerLogout = async function(){
+  fecharMenuLateral();
   if (!confirm('Sair da sua conta?')) return;
   await signOut(auth);
 };
