@@ -730,10 +730,7 @@
 
       <div>
         <div class="section-title">Por segmento</div>
-        <div class="card" id="invest-segmento-card">
-          <div class="cat-bar" id="invest-seg-bar"></div>
-          <div id="invest-seg-legenda" style="margin-top:12px"></div>
-        </div>
+        <div class="card" id="invest-segmento-card"><p class="empty-hint">—</p></div>
       </div>
     </div>
 
@@ -1207,6 +1204,7 @@
           <button type="button" class="active" data-val="Renda Fixa" onclick="toggleTipoInvestimento(this)">Renda Fixa</button>
           <button type="button" data-val="Renda Variável" onclick="toggleTipoInvestimento(this)">Renda Var.</button>
           <button type="button" data-val="Cripto" onclick="toggleTipoInvestimento(this)">Cripto</button>
+          <button type="button" data-val="Moeda Estrangeira" onclick="toggleTipoInvestimento(this)">Moeda Estr.</button>
         </div>
         <input type="hidden" id="inv-tipo" value="Renda Fixa">
       </div>
@@ -1285,6 +1283,22 @@
           <input type="number" step="0.01" inputmode="decimal" id="inv-cripto-preco-medio" placeholder="0,00">
         </div>
         <div class="hint muted" style="margin:-8px 2px 16px">Moedas da lista atualizam sozinhas. "Outra" fica no preço médio até você editar manualmente.</div>
+      </div>
+
+      <div id="inv-bloco-moeda" style="display:none">
+        <div class="campo">
+          <label>Moeda</label>
+          <input type="text" value="Dólar (USD)" disabled style="color:var(--ink-soft); background:var(--cream)">
+        </div>
+        <div class="campo">
+          <label>Quantidade em dólares (US$)</label>
+          <input type="number" step="0.01" inputmode="decimal" id="inv-moeda-quantidade" placeholder="Ex: 743,69">
+        </div>
+        <div class="campo">
+          <label>Cotação de compra (R$ por US$)</label>
+          <input type="number" step="0.0001" inputmode="decimal" id="inv-moeda-cotacao-compra" placeholder="Ex: 4,7740">
+        </div>
+        <div class="hint muted" style="margin:-8px 2px 16px">Buscamos a cotação do dólar automaticamente (no máximo 1x a cada 4h, ou toque em "🔄 Atualizar"). Usamos a cotação de compra pra calcular o quanto essa posição já rendeu ou perdeu com a variação do dólar.</div>
       </div>
 
       <div id="inv-bloco-prefixado">
@@ -1633,6 +1647,9 @@ window.abrirFormInvestimento = function(id){
       document.getElementById('inv-cripto-simbolo').value = inv.simbolo || 'BTC';
       document.getElementById('inv-cripto-quantidade').value = inv.quantidade || '';
       document.getElementById('inv-cripto-preco-medio').value = inv.precoMedio || '';
+    } else if (inv.tipo === 'Moeda Estrangeira'){
+      document.getElementById('inv-moeda-quantidade').value = inv.quantidade || '';
+      document.getElementById('inv-moeda-cotacao-compra').value = inv.precoMedio || '';
     } else {
       document.getElementById('inv-valor-manual').value = inv.valorManual || '';
     }
@@ -1652,9 +1669,11 @@ window.toggleTipoInvestimento = function(btn){
   const rfBloco = document.getElementById('inv-bloco-rendafixa');
   const rvBloco = document.getElementById('inv-bloco-rendavariavel');
   const criptoBloco = document.getElementById('inv-bloco-cripto');
+  const moedaBloco = document.getElementById('inv-bloco-moeda');
   rfBloco.style.display = 'none';
   rvBloco.style.display = 'none';
   criptoBloco.style.display = 'none';
+  moedaBloco.style.display = 'none';
   document.getElementById('inv-bloco-prefixado').style.display = 'none';
   document.getElementById('inv-bloco-cdi').style.display = 'none';
   document.getElementById('inv-bloco-manual').style.display = 'none';
@@ -1666,6 +1685,8 @@ window.toggleTipoInvestimento = function(btn){
     rvBloco.style.display = '';
   } else if (tipo === 'Cripto'){
     criptoBloco.style.display = '';
+  } else if (tipo === 'Moeda Estrangeira'){
+    moedaBloco.style.display = '';
   } else {
     document.getElementById('inv-bloco-manual').style.display = '';
   }
@@ -2344,6 +2365,10 @@ window.salvarInvestimento = async function(e){
     dados.precoMedio = parseFloat(document.getElementById('inv-cripto-preco-medio').value || 0);
     tickerMudou = !invAntiga || invAntiga.simbolo !== dados.simbolo;
     if (tickerMudou) dados.valorMercado = null;
+  } else if (tipo === 'Moeda Estrangeira'){
+    dados.moeda = 'USD'; // por ora só dólar
+    dados.quantidade = parseFloat(document.getElementById('inv-moeda-quantidade').value || 0);
+    dados.precoMedio = parseFloat(document.getElementById('inv-moeda-cotacao-compra').value || 0);
   } else {
     dados.valorManual = parseFloat(document.getElementById('inv-valor-manual').value || 0);
   }
@@ -2367,6 +2392,8 @@ window.salvarInvestimento = async function(e){
       if (dados.simbolo && dados.simbolo !== 'OUTRO') buscarCotacaoCripto(id, dados.simbolo);
       if (dados.modalidade === 'Pós-fixado (CDI)') buscarCDI(id);
     }
+    // moeda estrangeira: busca a cotação do dólar sempre que a posição é criada/editada, não só quando "muda o ticker"
+    if (tipo === 'Moeda Estrangeira') buscarCotacaoDolar(id);
   }catch(err){
     console.error(err);
     toast('Erro ao salvar. Veja o console.');
@@ -2475,11 +2502,30 @@ async function buscarCDI(investId){
   }
 }
 
+// Busca a cotação do dólar comercial via AwesomeAPI (pública, sem necessidade de chave/token)
+async function buscarCotacaoDolar(investId){
+  try{
+    const resp = await fetch('https://economia.awesomeapi.com.br/last/USD-BRL');
+    if (!resp.ok) throw new Error('HTTP '+resp.status);
+    const json = await resp.json();
+    const preco = json?.USDBRL?.bid ? parseFloat(json.USDBRL.bid) : null;
+    if (typeof preco === 'number' && !isNaN(preco)){
+      await updateDoc(doc(db, 'investimentos', investId), { valorMercado: preco, cotacaoAtualizadaEm: serverTimestamp() });
+      return true;
+    }
+    throw new Error('Sem cotação no retorno da API');
+  }catch(err){
+    console.warn('Não foi possível buscar a cotação do dólar', err);
+    return false;
+  }
+}
+
 window.atualizarCotacoes = async function(silencioso){
   const acoesFiis = investimentos.filter(inv => inv.tipo === 'Renda Variável' && inv.ticker);
   const criptos = investimentos.filter(inv => inv.tipo === 'Cripto' && inv.simbolo && inv.simbolo !== 'OUTRO');
   const cdis = investimentos.filter(inv => inv.tipo === 'Renda Fixa' && inv.modalidade === 'Pós-fixado (CDI)');
-  if (acoesFiis.length === 0 && criptos.length === 0 && cdis.length === 0){
+  const moedas = investimentos.filter(inv => inv.tipo === 'Moeda Estrangeira' && inv.moeda === 'USD');
+  if (acoesFiis.length === 0 && criptos.length === 0 && cdis.length === 0 && moedas.length === 0){
     if (!silencioso) toast('Nenhum ativo pra atualizar');
     return;
   }
@@ -2487,7 +2533,8 @@ window.atualizarCotacoes = async function(silencioso){
   const resultados = await Promise.all([
     ...acoesFiis.map(inv => buscarCotacaoAcaoFii(inv.id, inv.ticker)),
     ...criptos.map(inv => buscarCotacaoCripto(inv.id, inv.simbolo)),
-    ...cdis.map(inv => buscarCDI(inv.id))
+    ...cdis.map(inv => buscarCDI(inv.id)),
+    ...moedas.map(inv => buscarCotacaoDolar(inv.id))
   ]);
   const falhas = resultados.filter(r => r === false).length;
   localStorage.setItem('appfin_ultima_atualizacao_cotacoes', new Date().toISOString());
@@ -2551,7 +2598,7 @@ function valorAtualInvestimento(inv){
     const taxaMensal = Math.pow(1 + (taxaEfetivaAnual/100), 1/12) - 1;
     return (inv.valorInvestido||0) * Math.pow(1 + taxaMensal, meses);
   }
-  if ((inv.tipo === 'Renda Variável' || inv.tipo === 'Cripto') && inv.quantidade){
+  if ((inv.tipo === 'Renda Variável' || inv.tipo === 'Cripto' || inv.tipo === 'Moeda Estrangeira') && inv.quantidade){
     return inv.quantidade * precoUnitarioAtual(inv);
   }
   return inv.valorManual || 0;
@@ -2564,7 +2611,7 @@ function precoUnitarioAtual(inv){
 
 // Custo de aquisição (quantidade x preço médio) — usado pra calcular variação %
 function custoInvestimento(inv){
-  if ((inv.tipo === 'Renda Variável' || inv.tipo === 'Cripto') && inv.quantidade){
+  if ((inv.tipo === 'Renda Variável' || inv.tipo === 'Cripto' || inv.tipo === 'Moeda Estrangeira') && inv.quantidade){
     return inv.quantidade * (inv.precoMedio||0);
   }
   return valorAtualInvestimento(inv);
@@ -2573,10 +2620,11 @@ function custoInvestimento(inv){
 function segmentoDe(inv){
   if (inv.tipo === 'Renda Fixa') return 'Renda Fixa';
   if (inv.tipo === 'Cripto') return 'Cripto';
+  if (inv.tipo === 'Moeda Estrangeira') return 'Moeda Estrangeira';
   return 'Renda Variável';
 }
 
-const CORES_SEGMENTO = { 'Renda Fixa':'#6E9B7B', 'Renda Variável':'#B5645A', 'Cripto':'#B9A06B' };
+const CORES_SEGMENTO = { 'Renda Fixa':'#6E9B7B', 'Renda Variável':'#B5645A', 'Cripto':'#B9A06B', 'Moeda Estrangeira':'#4F6D93' };
 const CORES_TIPO_PATRIMONIO = { 'Contas correntes':'#5B7291', 'Investimentos':'#B9A06B' };
 let instituicoesExpandidas = new Set();
 
@@ -2621,7 +2669,7 @@ function renderInvestimentos(){
           <div class="despesa-item" style="margin-top:10px; flex-wrap:wrap">
             <div class="despesa-info">
               <div class="despesa-nome">${inv.nomeAtivo}${inv.ticker ? ' · '+inv.ticker : ''}${inv.simbolo ? ' · '+inv.simbolo : ''}</div>
-              <div class="despesa-sub">${inv.tipo}${inv.modalidade ? ' · '+inv.modalidade : ''}${inv.segmento ? ' · '+inv.segmento : ''}${inv.quantidade ? ' · '+inv.quantidade+' un.' : ''}</div>
+              <div class="despesa-sub">${inv.tipo}${inv.modalidade ? ' · '+inv.modalidade : ''}${inv.segmento ? ' · '+inv.segmento : ''}${inv.quantidade ? (inv.tipo === 'Moeda Estrangeira' ? ' · US$ '+inv.quantidade.toLocaleString('pt-BR',{minimumFractionDigits:2}) : ' · '+inv.quantidade+' un.') : ''}</div>
               ${temCota ? `<div class="despesa-sub mono" style="margin-top:3px">Cota atual: ${brl(precoUnitarioAtual(inv))}${atualizouMercado ? '' : ' (preço médio — sem cotação ainda)'}</div>` : ''}
               ${inv.proventoMes ? `<div class="despesa-sub" style="margin-top:3px; color:var(--green)">💰 Provento em ${formatarData(inv.proventoMes.data)}: ${brl((inv.proventoMes.valor||0)*(inv.quantidade||0))}</div>` : ''}
               ${variacao !== null ? `<div class="despesa-sub" style="color:${variacao>=0?'var(--green)':'var(--terracota)'}; margin-top:3px">${variacao>=0?'↑':'↓'} ${Math.abs(variacao).toFixed(1)}% vs preço médio</div>` : ''}
@@ -2647,24 +2695,9 @@ function renderInvestimentos(){
     porSegmento[seg] = (porSegmento[seg]||0) + valorAtualInvestimento(inv);
   });
   const segsOrdenados = Object.entries(porSegmento).sort((a,b)=> b[1]-a[1]);
-  const barEl = document.getElementById('invest-seg-bar');
-  const legEl = document.getElementById('invest-seg-legenda');
-  if (segsOrdenados.length === 0){
-    barEl.style.display = 'none';
-    legEl.innerHTML = '<p class="empty-hint">Nada cadastrado ainda</p>';
-  } else {
-    barEl.style.display = 'flex';
-    barEl.innerHTML = segsOrdenados.map(([nome,val]) =>
-      `<div style="width:${(val/total*100)}%; background:${CORES_SEGMENTO[nome]}"></div>`
-    ).join('');
-    legEl.innerHTML = segsOrdenados.map(([nome,val]) => `
-      <div class="cat-legenda-item">
-        <span class="dot" style="background:${CORES_SEGMENTO[nome]}"></span>
-        <span class="nome">${nome}</span>
-        <span class="pct mono">${brl(val)}</span>
-      </div>
-    `).join('');
-  }
+  const segCardEl = document.getElementById('invest-segmento-card');
+  const fatiasSeg = segsOrdenados.map(([nome,val]) => [nome, val, CORES_SEGMENTO[nome] || '#8A8F9C']);
+  segCardEl.innerHTML = htmlDonutComCores(fatiasSeg, 'var(--ink)', 'Nada cadastrado ainda');
 
   renderPatrimonio();
   renderRankingESugestoes();
@@ -2691,7 +2724,7 @@ function renderRankingESugestoes(){
 
   // só entram no ranking ativos com variação calculável (Renda Variável e Cripto com quantidade)
   const comRetorno = investimentos
-    .filter(inv => (inv.tipo === 'Renda Variável' || inv.tipo === 'Cripto') && inv.quantidade)
+    .filter(inv => (inv.tipo === 'Renda Variável' || inv.tipo === 'Cripto' || inv.tipo === 'Moeda Estrangeira') && inv.quantidade)
     .map(inv => {
       const valorAtual = valorAtualInvestimento(inv);
       const custo = custoInvestimento(inv);
@@ -3795,6 +3828,46 @@ function htmlDonutCategorias(mapa, corTotal, msgVazio){
   return `
     <div class="donut-corpo">
       <svg width="150" height="150" viewBox="0 0 150 150" style="flex-shrink:0" role="img" aria-label="Distribuição por categoria">
+        <circle cx="75" cy="75" r="${R}" fill="none" stroke="var(--line)" stroke-width="${SW}"/>
+        ${arcos}
+        <text x="75" y="73" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="13" fill="var(--ink)">${brlCurto(total)}</text>
+        <text x="75" y="89" text-anchor="middle" font-family="'Jost',sans-serif" font-size="9.5" fill="var(--ink-soft)">total</text>
+      </svg>
+      <div class="donut-legenda">${legenda}</div>
+    </div>
+    <div class="donut-total"><span>Total</span><span class="mono" style="color:${corTotal}">${brl(total)}</span></div>`;
+}
+
+// Donut genérico com cor própria por fatia (não pela paleta fixa de categorias) — usado em "Por segmento"
+// (Investimentos), onde cada segmento (Renda Fixa/Renda Variável/Cripto/Moeda Estrangeira) já tem sua cor definida.
+function htmlDonutComCores(fatias, corTotal, msgVazio){
+  const total = fatias.reduce((s,[,v])=> s+v, 0);
+  if (total <= 0) return `<p class="empty-hint">${msgVazio}</p>`;
+  const pctTxt = v => (v/total*100).toFixed(1).replace('.',',') + '%';
+  const R = 52, SW = 22, C = 2*Math.PI*R;
+  let acum = 0;
+  const arcos = fatias.map(([nome,val,cor]) => {
+    const len = val/total*C;
+    const seg = Math.max(0, len - (fatias.length > 1 ? 2 : 0));
+    const arco = `<circle cx="75" cy="75" r="${R}" fill="none" stroke="${cor}" stroke-width="${SW}" stroke-dasharray="${seg.toFixed(2)} ${(C-seg).toFixed(2)}" stroke-dashoffset="${(-acum).toFixed(2)}" transform="rotate(-90 75 75)"><title>${nome}: ${brl(val)} (${pctTxt(val)})</title></circle>`;
+    acum += len;
+    return arco;
+  }).join('');
+  // legenda compacta (valor/% empilhados à direita) — mesmo padrão já usado em "Onde foi seu dinheiro este mês"
+  // e na fatura do cartão, comprovadamente mobile-friendly (o layout lado a lado do .donut-item, feito pra
+  // colunas largas de desktop, espreme demais o nome quando esse card aparece em telas estreitas)
+  const legenda = fatias.map(([nome,val,cor]) => `
+    <div class="cat-legenda-item" style="cursor:default">
+      <span class="dot" style="background:${cor}"></span>
+      <span class="nome">${nome}</span>
+      <span class="valores">
+        <span class="valor">${brl(val)}</span>
+        <span class="pct">${pctTxt(val)}</span>
+      </span>
+    </div>`).join('');
+  return `
+    <div class="donut-corpo">
+      <svg width="150" height="150" viewBox="0 0 150 150" style="flex-shrink:0" role="img" aria-label="Distribuição por segmento">
         <circle cx="75" cy="75" r="${R}" fill="none" stroke="var(--line)" stroke-width="${SW}"/>
         ${arcos}
         <text x="75" y="73" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="13" fill="var(--ink)">${brlCurto(total)}</text>
