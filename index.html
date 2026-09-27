@@ -361,10 +361,11 @@
     #view-home .db-distribuicao{ grid-column:1; grid-row:3; }
     #view-home .db-comparativo{ grid-column:2; grid-row:3; }
     #view-home .db-donuts{ grid-column:1 / -1; grid-row:4; display:block; }
-    #view-home .kpi-strip{ margin-bottom:0; gap:12px; }
+    #view-home .kpi-strip{ margin-bottom:0; gap:12px; grid-template-columns:repeat(5,1fr); }
     #view-home .proj-meses-cards{ grid-template-columns:repeat(auto-fit, minmax(235px, 1fr)); }
     @media (max-width:1199px){
       #view-home .proj-kpis{ grid-template-columns:1fr 1fr; }
+      #view-home .kpi-strip{ grid-template-columns:repeat(3,1fr); }
       /* telas menores: uma coluna só (lateral vem depois da principal) */
       #view-home.active{ grid-template-columns:minmax(0,1fr); }
       #view-home header.app-header, #view-home .db-quote, #view-home .home-col-main, #view-home .home-col-side,
@@ -398,21 +399,48 @@
     #view-home .db-donuts #donut-despesas{ border-left-color:var(--terracota); }
     #view-home .fluxo-card-inner{ border-left:4px solid var(--navy); }
 
-    /* ---- Contas: KPI + contas em grid + receitas/despesas lado a lado ---- */
+    /* ---- Layout de 2 colunas (principal + lateral), reaproveitado em Contas, Investimentos e Cartões ---- */
+    #view-contas.active, #view-investimentos.active, #cartoes-painel-lista, #cartoes-painel-fatura{
+      display:grid; grid-template-columns:minmax(0,1fr) clamp(320px, 22vw, 440px); column-gap:20px; row-gap:16px; align-items:start;
+      max-width:none; margin:0; padding:28px 32px 56px;
+    }
+    #view-contas main, #view-investimentos main, #cartoes-painel-lista main, #cartoes-painel-fatura main{ display:contents; }
+    #view-contas header.app-header, #view-investimentos header.app-header,
+    #cartoes-painel-lista header.app-header, #cartoes-painel-fatura header.app-header{
+      grid-column:1/-1; grid-row:1; margin-bottom:0; padding-bottom:0; border-bottom:none;
+    }
+    #view-contas .col-main, #view-investimentos .col-main, #cartoes-painel-lista .col-main, #cartoes-painel-fatura .col-main{
+      grid-column:1; grid-row:2; display:flex; flex-direction:column; gap:16px; min-width:0;
+    }
+    #view-contas .col-side, #view-investimentos .col-side, #cartoes-painel-lista .col-side, #cartoes-painel-fatura .col-side{
+      grid-column:2; grid-row:2; display:flex; flex-direction:column; gap:16px; min-width:0;
+    }
+    @media (max-width:1199px){
+      #view-contas.active, #view-investimentos.active, #cartoes-painel-lista, #cartoes-painel-fatura{ grid-template-columns:minmax(0,1fr); }
+      #view-contas .col-main, #view-contas .col-side, #view-investimentos .col-main, #view-investimentos .col-side,
+      #cartoes-painel-lista .col-main, #cartoes-painel-lista .col-side, #cartoes-painel-fatura .col-main, #cartoes-painel-fatura .col-side{
+        grid-column:1; grid-row:auto;
+      }
+    }
+
+    /* ---- Contas: contas cadastradas na lateral (empilhadas, sem grid de 3 colunas) ---- */
     #view-contas header.app-header .header-sub, #view-contas header.app-header .big-value{ display:none; }
-    #lista-contas{ display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; }
+    #lista-contas{ display:flex; flex-direction:column; gap:10px; }
     #lista-contas .conta-card{ margin-bottom:0; border-left:4px solid var(--navy); }
     .mov-cols{ display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start; }
     #view-contas .despesa-item{ border-left:3px solid var(--terracota); }
     #view-contas #lista-entradas .despesa-item{ border-left:3px solid var(--green); }
     #view-contas #mes-projecao-card{ display:none; } /* os 4 números já estão na faixa de KPI */
+
+    /* ---- Investimentos ---- */
     #view-investimentos header.app-header .header-sub, #view-investimentos header.app-header .big-value{ display:none; }
     #lista-investimentos .card{ border-left:4px solid var(--gold); }
-    .inv-order-posicoes{ order:3; }
-    .inv-order-ranking{ order:2; }
-    #lista-cartoes{ display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; }
+    #invest-reserva-emergencia{ border-left:4px solid var(--gold); }
+
+    /* ---- Cartões ---- */
+    #lista-cartoes{ display:grid; grid-template-columns:repeat(2, 1fr); gap:14px; }
     #lista-cartoes .conta-card{ margin-bottom:0; border-left:4px solid var(--gold); }
-    #cartoes-painel-fatura .mov-cols{ margin-bottom:16px; }
+    #cartoes-painel-fatura .mov-cols{ margin-bottom:0; }
   }
 </style>
 </head>
@@ -513,6 +541,11 @@
         <div class="lbl">Saídas previstas</div>
         <div class="val" id="kpi-saidas">R$ 0,00</div>
         <div class="sub" id="kpi-saidas-sub">no mês</div>
+      </div>
+      <div class="kpi-tile tone-gold">
+        <div class="lbl">Patrimônio total</div>
+        <div class="val" id="kpi-home-patrimonio">R$ 0,00</div>
+        <div class="sub">contas + investimentos</div>
       </div>
     </div>
 
@@ -618,6 +651,13 @@
     <p class="big-value" id="contas-disponivel-total">R$ 0,00</p>
   </header>
   <main>
+    <div class="col-side">
+    <div class="section-title">Cadastradas</div>
+    <div id="lista-contas"><p class="empty-hint">Nenhuma conta cadastrada ainda</p></div>
+    <button class="btn btn-outline" onclick="abrirFormConta()">+ &nbsp;Nova conta</button>
+    </div><!-- /col-side -->
+
+    <div class="col-main">
     <div class="kpi-strip">
       <div class="kpi-tile tone-navy">
         <div class="lbl">Saldo total</div>
@@ -641,11 +681,7 @@
       </div>
     </div>
 
-    <div class="section-title">Cadastradas</div>
-    <div id="lista-contas"><p class="empty-hint">Nenhuma conta cadastrada ainda</p></div>
-    <button class="btn btn-outline" onclick="abrirFormConta()">+ &nbsp;Nova conta</button>
-
-    <div class="section-title" style="margin-top:26px">Movimentação do mês</div>
+    <div class="section-title">Movimentação do mês</div>
     <div class="month-switch">
       <button onclick="mudarMes(-1)">‹</button>
       <span class="label" id="mes-label">—</span>
@@ -683,6 +719,7 @@
         <div id="lista-despesas"><p class="empty-hint">Nenhuma despesa neste mês</p></div>
       </div>
     </div>
+    </div><!-- /col-main -->
   </main>
 </section>
 
@@ -695,7 +732,8 @@
     <p class="big-value" id="invest-total">R$ 0,00</p>
   </header>
   <main>
-    <div class="kpi-strip">
+    <div class="col-main">
+    <div class="kpi-strip kpi-strip-3">
       <div class="kpi-tile tone-navy">
         <div class="lbl">Total investido</div>
         <div class="val" id="kpi-inv-total">R$ 0,00</div>
@@ -710,11 +748,6 @@
         <div class="lbl">Melhor retorno</div>
         <div class="val" id="kpi-inv-melhor">—</div>
         <div class="sub" id="kpi-inv-melhor-sub">—</div>
-      </div>
-      <div class="kpi-tile tone-gold" id="kpi-inv-alertas-tile">
-        <div class="lbl">Sugestões da carteira</div>
-        <div class="val" id="kpi-inv-alertas">0</div>
-        <div class="sub">sinalizações ativas</div>
       </div>
     </div>
 
@@ -744,17 +777,14 @@
       <button class="btn btn-outline" onclick="abrirFormInvestimento()">+ &nbsp;Nova posição</button>
     </div>
 
-    <div class="mov-cols inv-order-ranking" style="margin-top:22px">
-      <div>
-        <div class="section-title">Ranking de retorno</div>
-        <div id="invest-ranking"><p class="empty-hint">Cadastre ações, FIIs ou cripto pra ver o ranking</p></div>
-      </div>
+    <div class="section-title" style="margin-top:22px">Reserva de emergência</div>
+    <div class="card" id="invest-reserva-emergencia"><p class="empty-hint">—</p></div>
+    </div><!-- /col-main -->
 
-      <div>
-        <div class="section-title">Sugestões da carteira</div>
-        <div id="invest-sugestoes"><p class="empty-hint">Sem sugestões por enquanto</p></div>
-      </div>
-    </div>
+    <div class="col-side">
+    <div class="section-title">Ranking de retorno</div>
+    <div id="invest-ranking"><p class="empty-hint">Cadastre ações, FIIs ou cripto pra ver o ranking</p></div>
+    </div><!-- /col-side -->
   </main>
 </section>
 
@@ -770,6 +800,7 @@
       <p class="big-value" id="cartoes-limite-total">R$ 0,00</p>
     </header>
     <main>
+    <div class="col-main">
       <div class="kpi-strip kpi-strip-3">
         <div class="kpi-tile tone-navy">
           <div class="lbl">Limite disponível total</div>
@@ -791,6 +822,12 @@
       <div class="section-title">Cadastrados</div>
       <div id="lista-cartoes"><p class="empty-hint">Nenhum cartão cadastrado ainda</p></div>
       <button class="btn btn-outline" onclick="abrirFormCartao()">+ &nbsp;Novo cartão</button>
+    </div><!-- /col-main -->
+
+    <div class="col-side">
+      <div class="section-title">Próximos vencimentos</div>
+      <div id="cartoes-vencimentos"><p class="empty-hint">Nenhum cartão cadastrado ainda</p></div>
+    </div><!-- /col-side -->
     </main>
   </div>
 
@@ -812,6 +849,7 @@
       <p class="big-value" id="fatura-total">R$ 0,00</p>
     </header>
     <main>
+      <div class="col-main">
       <div class="btn-row" style="margin-bottom:10px">
         <button class="btn-outline small" style="padding:13px" onclick="document.getElementById('input-extrato').click()">⇪ Importar extrato</button>
         <button class="btn-outline small" style="padding:13px" onclick="abrirFormLancamento()">＋ Lançamento manual</button>
@@ -825,23 +863,20 @@
       </div>
       <input type="file" id="input-extrato" accept=".csv,.xlsx,.xls" style="display:none" onchange="importarExtrato(event)">
 
-      <div class="mov-cols">
-        <div>
-          <div class="section-title">Gasto por categoria</div>
-          <div class="card" id="fatura-categoria-card">
-            <div class="cat-bar" id="fatura-cat-bar"></div>
-            <div id="fatura-cat-legenda" style="margin-top:12px"></div>
-          </div>
-        </div>
-
-        <div>
-          <div class="section-title">Compromisso de parcelas</div>
-          <div id="fatura-parcelas"><p class="empty-hint">Nenhuma parcela em aberto</p></div>
-        </div>
+      <div class="section-title">Gasto por categoria</div>
+      <div class="card" id="fatura-categoria-card">
+        <div class="cat-bar" id="fatura-cat-bar"></div>
+        <div id="fatura-cat-legenda" style="margin-top:12px"></div>
       </div>
 
       <div class="section-title">Lançamentos</div>
       <div id="lista-lancamentos"><p class="empty-hint">Nenhum lançamento nesta fatura</p></div>
+      </div><!-- /col-main -->
+
+      <div class="col-side">
+      <div class="section-title">Compromisso de parcelas</div>
+      <div id="fatura-parcelas"><p class="empty-hint">Nenhuma parcela em aberto</p></div>
+      </div><!-- /col-side -->
     </main>
   </div>
 </section>
@@ -1349,6 +1384,13 @@
         <div class="hint muted" style="margin:-8px 2px 16px">Esse tipo ainda não atualiza sozinho — edite quando o valor mudar.</div>
       </div>
 
+      <div class="campo">
+        <label style="display:flex; align-items:center; gap:9px; cursor:pointer; text-transform:none; font-weight:500; color:var(--ink); font-size:13.5px">
+          <input type="checkbox" id="inv-reserva-emergencia" style="width:17px; height:17px; accent-color:var(--navy); margin:0; cursor:pointer; flex-shrink:0">
+          🛟 Isso é parte da minha reserva de emergência
+        </label>
+      </div>
+
       <button class="btn btn-primary" type="submit" id="inv-submit-btn">Salvar posição</button>
     </form>
   </div>
@@ -1619,6 +1661,7 @@ window.abrirFormInvestimento = function(id){
     document.getElementById('inv-submit-btn').textContent = 'Salvar alterações';
     document.getElementById('inv-instituicao').value = inv.instituicao || '';
     document.getElementById('inv-nome').value = inv.nomeAtivo || '';
+    document.getElementById('inv-reserva-emergencia').checked = !!inv.reservaEmergencia;
     // seleciona o tipo certo no seg control
     document.querySelectorAll('#form-investimento .seg [data-val]').forEach(b=>{});
     const tipoBtn = document.querySelector(`[onclick="toggleTipoInvestimento(this)"][data-val="${inv.tipo}"]`);
@@ -2324,7 +2367,8 @@ window.salvarInvestimento = async function(e){
   const instituicao = document.getElementById('inv-instituicao').value.trim();
   const nomeAtivo = document.getElementById('inv-nome').value.trim();
   const tipo = document.getElementById('inv-tipo').value;
-  const dados = { instituicao, nomeAtivo, tipo, userId: usuarioAtual.uid };
+  const reservaEmergencia = document.getElementById('inv-reserva-emergencia').checked;
+  const dados = { instituicao, nomeAtivo, tipo, reservaEmergencia, userId: usuarioAtual.uid };
   const editando = !!investimentoEditandoId;
   const invAntiga = editando ? investimentos.find(i => i.id === investimentoEditandoId) : null;
   if (!editando) dados.criadoEm = serverTimestamp();
@@ -2673,6 +2717,7 @@ function renderInvestimentos(){
               ${temCota ? `<div class="despesa-sub mono" style="margin-top:3px">Cota atual: ${brl(precoUnitarioAtual(inv))}${atualizouMercado ? '' : ' (preço médio — sem cotação ainda)'}</div>` : ''}
               ${inv.proventoMes ? `<div class="despesa-sub" style="margin-top:3px; color:var(--green)">💰 Provento em ${formatarData(inv.proventoMes.data)}: ${brl((inv.proventoMes.valor||0)*(inv.quantidade||0))}</div>` : ''}
               ${variacao !== null ? `<div class="despesa-sub" style="color:${variacao>=0?'var(--green)':'var(--terracota)'}; margin-top:3px">${variacao>=0?'↑':'↓'} ${Math.abs(variacao).toFixed(1)}% vs preço médio</div>` : ''}
+              ${inv.reservaEmergencia ? `<div class="despesa-sub" style="margin-top:3px; color:var(--green)">🛟 Reserva de emergência</div>` : ''}
             </div>
             <div class="despesa-valor" style="color:${CORES_SEGMENTO[segmentoDe(inv)]}">${brl(valorAtual)}</div>
             <button class="del-btn" onclick="abrirFormInvestimento('${inv.id}')">✏️</button>
@@ -2697,30 +2742,38 @@ function renderInvestimentos(){
   const segsOrdenados = Object.entries(porSegmento).sort((a,b)=> b[1]-a[1]);
   const segCardEl = document.getElementById('invest-segmento-card');
   const fatiasSeg = segsOrdenados.map(([nome,val]) => [nome, val, CORES_SEGMENTO[nome] || '#8A8F9C']);
-  segCardEl.innerHTML = htmlDonutComCores(fatiasSeg, 'var(--ink)', 'Nada cadastrado ainda');
+
+  // "Renda Variável" expande pra mostrar o detalhe por segmento (Ações, FIIs, ETFs, BDRs...) — a posição
+  // continua contando como Renda Fixa/Variável/etc. no gráfico; isso é só um detalhamento visual dessa fatia
+  const detalhesSegmento = {};
+  const rvPorSegmento = {};
+  investimentos.filter(inv => inv.tipo === 'Renda Variável').forEach(inv => {
+    const seg = inv.segmento || 'Outro';
+    rvPorSegmento[seg] = (rvPorSegmento[seg]||0) + valorAtualInvestimento(inv);
+  });
+  if (Object.keys(rvPorSegmento).length){
+    detalhesSegmento['Renda Variável'] = Object.entries(rvPorSegmento).map(([nome,valor]) => ({nome,valor}));
+  }
+
+  segCardEl.innerHTML = htmlDonutComCores(fatiasSeg, 'var(--ink)', 'Nada cadastrado ainda', detalhesSegmento);
 
   renderPatrimonio();
-  renderRankingESugestoes();
+  renderRanking();
+  renderReservaEmergencia();
 }
 
-// ---------- Ranking de retorno e sugestões da carteira ----------
+// ---------- Ranking de retorno ----------
 let rankingExpandido = false;
-let sugestoesExpandido = false;
 const LIMITE_LISTA_INVEST = 5;
 
 window.toggleRankingExpandido = function(){
   rankingExpandido = !rankingExpandido;
-  renderRankingESugestoes();
-};
-window.toggleSugestoesExpandido = function(){
-  sugestoesExpandido = !sugestoesExpandido;
-  renderRankingESugestoes();
+  renderRanking();
 };
 
-function renderRankingESugestoes(){
+function renderRanking(){
   const rankingEl = document.getElementById('invest-ranking');
-  const sugestoesEl = document.getElementById('invest-sugestoes');
-  if (!rankingEl || !sugestoesEl) return;
+  if (!rankingEl) return;
 
   // só entram no ranking ativos com variação calculável (Renda Variável e Cripto com quantidade)
   const comRetorno = investimentos
@@ -2772,57 +2825,60 @@ function renderRankingESugestoes(){
     }
   }
 
-  // --- Sugestões heurísticas (não é recomendação financeira, só sinalização) ---
-  const sugestoes = [];
-  const totalCarteira = investimentos.reduce((s,inv)=> s + valorAtualInvestimento(inv), 0);
+}
 
-  comRetorno.forEach(r => {
-    if (r.variacao <= -15){
-      sugestoes.push({ tipo:'queda', texto:`${r.inv.nomeAtivo} está ${Math.abs(r.variacao).toFixed(1)}% abaixo do preço médio — pode valer reavaliar se a tese ainda se sustenta.` });
-    }
-    if (r.variacao >= 30){
-      sugestoes.push({ tipo:'alta', texto:`${r.inv.nomeAtivo} subiu ${r.variacao.toFixed(1)}% acima do preço médio — considere realizar parte do lucro.` });
-    }
-    if (totalCarteira > 0 && (r.valorAtual/totalCarteira) > 0.30){
-      sugestoes.push({ tipo:'concentracao', texto:`${r.inv.nomeAtivo} já representa ${(r.valorAtual/totalCarteira*100).toFixed(0)}% da carteira de investimentos — concentração alta num único ativo.` });
-    }
-  });
+// ---------- Reserva de emergência ----------
+// Base de despesas fixas: despesas cadastradas em Contas com tipo "Fixa" (não parceladas) + assinaturas fixas
+// do cartão (tipo "Fixa", não parceladas), do mês atual — exatamente como o Fernando definiu (parcelas/dívidas
+// ficam de fora do cálculo). Meta = 3x essa base. Reserva = soma das posições marcadas com o fleg reservaEmergencia.
+function calcularReservaEmergencia(){
+  const chaveMes = mesChave(new Date());
+  const fixasContas = despesas
+    .filter(d => (d.vencimento||'').startsWith(chaveMes) && d.tipo === 'Fixa' && !(d.parcelaTotal > 1))
+    .reduce((s,d)=> s + (d.valor||0), 0);
+  const fixasCartao = cartoes.reduce((s,cart) =>
+    s + itensDaFaturaPara(cart.id, chaveMes)
+      .filter(it => it.tipo === 'Fixa' && !(it.parcelaTotal > 1))
+      .reduce((s2,it)=> s2 + it.valor, 0)
+  , 0);
+  const despesasFixasTotais = fixasContas + fixasCartao;
+  const metaReserva = despesasFixasTotais * 3;
+  const totalReserva = investimentos.filter(inv => inv.reservaEmergencia).reduce((s,inv)=> s + valorAtualInvestimento(inv), 0);
+  const percentual = metaReserva > 0 ? (totalReserva/metaReserva*100) : (totalReserva > 0 ? 100 : 0);
+  return { despesasFixasTotais, metaReserva, totalReserva, percentual };
+}
 
-  // concentração por segmento
-  const porSeg = {};
-  investimentos.forEach(inv => { porSeg[segmentoDe(inv)] = (porSeg[segmentoDe(inv)]||0) + valorAtualInvestimento(inv); });
-  Object.entries(porSeg).forEach(([seg,val]) => {
-    if (totalCarteira > 0 && (val/totalCarteira) > 0.70){
-      sugestoes.push({ tipo:'rebalanceamento', texto:`${seg} concentra ${(val/totalCarteira*100).toFixed(0)}% da carteira — pode valer diversificar mais entre os segmentos.` });
-    }
-  });
+function renderReservaEmergencia(){
+  const el = document.getElementById('invest-reserva-emergencia');
+  if (!el) return;
+  const { despesasFixasTotais, metaReserva, totalReserva, percentual } = calcularReservaEmergencia();
+  const cor = percentual >= 100 ? 'var(--green)' : percentual >= 50 ? 'var(--gold)' : 'var(--terracota)';
 
-  if (sugestoes.length === 0){
-    sugestoesEl.innerHTML = '<p class="empty-hint">Nenhum alerta no momento — carteira parece equilibrada</p>';
+  let mensagem;
+  if (despesasFixasTotais <= 0){
+    mensagem = 'Cadastre despesas fixas em Contas (ou assinaturas fixas no cartão) pra calcular sua meta de reserva.';
+  } else if (percentual >= 100){
+    mensagem = 'Sua reserva cobre 3x as despesas fixas do mês — meta atingida. 🎉';
   } else {
-    const itensSugestoes = sugestoesExpandido ? sugestoes : sugestoes.slice(0, LIMITE_LISTA_INVEST);
-    const restoSugestoes = sugestoes.length - itensSugestoes.length;
-    sugestoesEl.innerHTML = itensSugestoes.map(s => `
-      <div class="card" style="border-color:${s.tipo==='alta'?'var(--green)':'var(--gold)'}">
-        <div class="muted" style="line-height:1.5">${s.texto}</div>
-      </div>
-    `).join('') +
-    (sugestoes.length > LIMITE_LISTA_INVEST ? `
-      <button class="toggle-pagas" style="justify-content:center; gap:6px" onclick="toggleSugestoesExpandido()">
-        <span>${sugestoesExpandido ? 'Ver menos' : `Ver mais ${restoSugestoes}`}</span>
-        <span class="seta" style="${sugestoesExpandido ? 'transform:rotate(180deg)' : ''}">▾</span>
-      </button>
-    ` : '') +
-    `<div class="hint muted" style="padding:4px 2px">Sinalização automática por regras simples — não é recomendação de investimento.</div>`;
+    mensagem = `Faltam ${brl(Math.max(0, metaReserva - totalReserva))} pra completar 3x suas despesas fixas.`;
   }
 
-  const kpiAlertasEl = document.getElementById('kpi-inv-alertas');
-  const kpiAlertasTile = document.getElementById('kpi-inv-alertas-tile');
-  if (kpiAlertasEl){
-    kpiAlertasEl.textContent = sugestoes.length;
-    kpiAlertasTile.classList.toggle('tone-gold', sugestoes.length > 0);
-    kpiAlertasTile.classList.toggle('tone-green', sugestoes.length === 0);
-  }
+  el.innerHTML = `
+    <div class="row-between">
+      <span style="font-weight:500; font-size:13.5px">Reserva de emergência</span>
+      <span class="mono" style="color:${cor}; font-size:13.5px">${despesasFixasTotais > 0 ? percentual.toFixed(0)+'% da meta' : '—'}</span>
+    </div>
+    <div class="barra" style="margin-top:8px"><div class="barra-fill" style="width:${Math.min(100,percentual)}%; background:${cor}"></div></div>
+    <div class="muted" style="margin-top:8px">Meta (3x despesas fixas do mês): <span class="mono">${brl(metaReserva)}</span></div>
+    <div class="muted" style="margin-top:2px">Reservado hoje (posições flegadas): <span class="mono" style="color:${cor}">${brl(totalReserva)}</span></div>
+    <div class="muted" style="margin-top:6px; line-height:1.5">${mensagem}</div>
+  `;
+}
+
+// Valor total do patrimônio (saldo em contas + valor atual de todos os investimentos) — usado no card
+// "Patrimônio" da Início e no KPI equivalente em Investimentos, pra garantir que os dois nunca divergem.
+function patrimonioTotal(){
+  return contas.reduce((s,c)=> s + (c.saldo||0), 0) + investimentos.reduce((s,inv)=> s + valorAtualInvestimento(inv), 0);
 }
 
 function renderPatrimonio(){
@@ -3092,6 +3148,34 @@ function renderCartoes(){
     document.getElementById('kpi-cart-faturas').textContent = brl(faturasAbertasTotal);
     document.getElementById('kpi-cart-qtd').textContent = cartoes.length;
   }
+
+  renderVencimentosCartoes();
+}
+
+// "Próximos vencimentos" (lateral da lista de cartões): faturas abertas com algum lançamento, ordenadas
+// pelo dia de vencimento — mesmo espírito do widget de vencimentos da Início, olhando pra cartões.
+function renderVencimentosCartoes(){
+  const el = document.getElementById('cartoes-vencimentos');
+  if (!el) return;
+  if (cartoes.length === 0){
+    el.innerHTML = '<p class="empty-hint">Nenhum cartão cadastrado ainda</p>';
+    return;
+  }
+  const hojeISO = new Date().toISOString().slice(0,10);
+  const linhas = cartoes.map(cart => {
+    const chaveAberta = mesFaturaDe(hojeISO, cart);
+    return { cart, total: totalFaturaDe(cart.id, chaveAberta), diaVencimento: cart.diaVencimento || 10 };
+  }).filter(x => x.total > 0).sort((a,b)=> a.diaVencimento - b.diaVencimento);
+
+  el.innerHTML = linhas.length ? linhas.map(({cart,total,diaVencimento}) => `
+    <div class="despesa-item" style="cursor:pointer" onclick="abrirFatura('${cart.id}')">
+      <div class="despesa-info">
+        <div class="despesa-nome">${cart.nome}</div>
+        <div class="despesa-sub">Fatura aberta · vence dia ${diaVencimento}</div>
+      </div>
+      <div class="despesa-valor fixa">${brl(total)}</div>
+    </div>
+  `).join('') : '<p class="empty-hint">Nenhuma fatura aberta com lançamentos ainda</p>';
 }
 
 window.abrirFatura = function(cartaoId){
@@ -3840,7 +3924,16 @@ function htmlDonutCategorias(mapa, corTotal, msgVazio){
 
 // Donut genérico com cor própria por fatia (não pela paleta fixa de categorias) — usado em "Por segmento"
 // (Investimentos), onde cada segmento (Renda Fixa/Renda Variável/Cripto/Moeda Estrangeira) já tem sua cor definida.
-function htmlDonutComCores(fatias, corTotal, msgVazio){
+const segmentoExpandido = new Set(); // segmentos com o detalhe aberto no gráfico "Por segmento" (ex: Renda Variável)
+window.toggleSegmentoExpandido = function(nome){
+  if (segmentoExpandido.has(nome)) segmentoExpandido.delete(nome); else segmentoExpandido.add(nome);
+  renderInvestimentos();
+};
+
+// detalhesPorFatia (opcional): { 'Nome da fatia': [{nome, valor}, ...] } — quando presente pra uma fatia,
+// a linha da legenda fica clicável e expande a lista (mesmo padrão de acordeão usado em "Onde foi seu dinheiro").
+function htmlDonutComCores(fatias, corTotal, msgVazio, detalhesPorFatia){
+  detalhesPorFatia = detalhesPorFatia || {};
   const total = fatias.reduce((s,[,v])=> s+v, 0);
   if (total <= 0) return `<p class="empty-hint">${msgVazio}</p>`;
   const pctTxt = v => (v/total*100).toFixed(1).replace('.',',') + '%';
@@ -3856,15 +3949,25 @@ function htmlDonutComCores(fatias, corTotal, msgVazio){
   // legenda compacta (valor/% empilhados à direita) — mesmo padrão já usado em "Onde foi seu dinheiro este mês"
   // e na fatura do cartão, comprovadamente mobile-friendly (o layout lado a lado do .donut-item, feito pra
   // colunas largas de desktop, espreme demais o nome quando esse card aparece em telas estreitas)
-  const legenda = fatias.map(([nome,val,cor]) => `
-    <div class="cat-legenda-item" style="cursor:default">
+  const legenda = fatias.map(([nome,val,cor]) => {
+    const detalhe = detalhesPorFatia[nome];
+    const expandivel = Array.isArray(detalhe) && detalhe.length > 0;
+    const expandido = expandivel && segmentoExpandido.has(nome);
+    const chaveEscape = nome.replace(/'/g,"\\'");
+    return `
+    <div class="cat-legenda-item" style="cursor:${expandivel ? 'pointer' : 'default'}" ${expandivel ? `onclick="toggleSegmentoExpandido('${chaveEscape}')"` : ''}>
       <span class="dot" style="background:${cor}"></span>
       <span class="nome">${nome}</span>
       <span class="valores">
         <span class="valor">${brl(val)}</span>
         <span class="pct">${pctTxt(val)}</span>
       </span>
-    </div>`).join('');
+      ${expandivel ? `<span class="cat-seta ${expandido?'aberto':''}" style="margin-left:8px">▾</span>` : ''}
+    </div>
+    ${expandivel ? `<div class="cat-detalhe ${expandido?'aberto':''}">${detalhe.slice().sort((a,b)=>b.valor-a.valor).map(it => `
+        <div class="cat-detalhe-item"><span class="nome">${it.nome}</span><span class="valor">${brl(it.valor)}</span></div>
+      `).join('')}</div>` : ''}`;
+  }).join('');
   return `
     <div class="donut-corpo">
       <svg width="150" height="150" viewBox="0 0 150 150" style="flex-shrink:0" role="img" aria-label="Distribuição por segmento">
@@ -4077,6 +4180,7 @@ function renderHome(){
   document.getElementById('kpi-projecao').textContent = brl(saldoProjetado);
   document.getElementById('kpi-entradas').textContent = brl(totalEntradasMesTodas);
   document.getElementById('kpi-saidas').textContent = brl(totalDespesasComFatura);
+  document.getElementById('kpi-home-patrimonio').textContent = brl(patrimonioTotal());
   const kpiProjTile = document.getElementById('kpi-projecao-tile');
   const kpiProjSub = document.getElementById('kpi-projecao-sub');
   if (saldoProjetado >= 0){
@@ -4364,6 +4468,7 @@ function iniciarListeners(uid){
   unsubscribers.push(onSnapshot(query(collection(db, 'investimentos'), where('userId','==',uid), orderBy('criadoEm','asc')), snap => {
     investimentos = snap.docs.map(d => ({ id:d.id, ...d.data() }));
     renderInvestimentos();
+    renderHome(); // o card de Patrimônio da Início depende do valor dos investimentos também
     dispararAutoAtualizacaoCotacoes();
   }, err => console.error('investimentos:', err)));
 
