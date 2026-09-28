@@ -62,7 +62,7 @@
   .btn-outline{ background:#fff; border:1px solid var(--gold); color:var(--gold); width:100%; }
   .btn-outline.small{ padding:10px; font-size:12.5px; }
   .btn-row{ display:flex; gap:10px; }
-  .btn-row .btn{ flex:1; }
+  .btn-row .btn, .btn-row .btn-outline{ flex:1; width:auto; }
 
   .empty-hint{ color:var(--ink-soft); font-size:12.5px; padding:14px 2px; text-align:center; }
 
@@ -409,6 +409,10 @@
     #cartoes-painel-lista header.app-header, #cartoes-painel-fatura header.app-header{
       grid-column:1/-1; grid-row:1; margin-bottom:0; padding-bottom:0; border-bottom:none;
     }
+    #cartoes-painel-fatura .fat-acoes{ grid-column:1; grid-row:2; min-width:0; }
+    #cartoes-painel-fatura .fat-gasto{ grid-column:1; grid-row:3; min-width:0; }
+    #cartoes-painel-fatura .fat-parcelas{ grid-column:2; grid-row:2 / span 3; min-width:0; }
+    #cartoes-painel-fatura .fat-lanc{ grid-column:1; grid-row:4; min-width:0; }
     #view-contas .col-main, #view-investimentos .col-main, #cartoes-painel-lista .col-main, #cartoes-painel-fatura .col-main{
       grid-column:1; grid-row:2; display:flex; flex-direction:column; gap:16px; min-width:0;
     }
@@ -418,7 +422,8 @@
     @media (max-width:1199px){
       #view-contas.active, #view-investimentos.active, #cartoes-painel-lista, #cartoes-painel-fatura{ grid-template-columns:minmax(0,1fr); }
       #view-contas .col-main, #view-contas .col-side, #view-investimentos .col-main, #view-investimentos .col-side,
-      #cartoes-painel-lista .col-main, #cartoes-painel-lista .col-side, #cartoes-painel-fatura .col-main, #cartoes-painel-fatura .col-side{
+      #cartoes-painel-lista .col-main, #cartoes-painel-lista .col-side, #cartoes-painel-fatura .col-main, #cartoes-painel-fatura .col-side,
+      #cartoes-painel-fatura .fat-acoes, #cartoes-painel-fatura .fat-gasto, #cartoes-painel-fatura .fat-parcelas, #cartoes-painel-fatura .fat-lanc{
         grid-column:1; grid-row:auto;
       }
     }
@@ -849,7 +854,7 @@
       <p class="big-value" id="fatura-total">R$ 0,00</p>
     </header>
     <main>
-      <div class="col-main">
+      <div class="fat-acoes">
       <div class="btn-row" style="margin-bottom:10px">
         <button class="btn-outline small" style="padding:13px" onclick="document.getElementById('input-extrato').click()">⇪ Importar extrato</button>
         <button class="btn-outline small" style="padding:13px" onclick="abrirFormLancamento()">＋ Lançamento manual</button>
@@ -862,21 +867,25 @@
         <a href="#" id="link-marcar-paga-sem-debito" onclick="return marcarFaturaPagaSemDebito()" style="color:var(--ink-soft); font-size:11.5px; text-decoration:underline">Já paguei fora do app — só marcar como paga (sem debitar de novo)</a>
       </div>
       <input type="file" id="input-extrato" accept=".csv,.xlsx,.xls" style="display:none" onchange="importarExtrato(event)">
+      </div><!-- /fat-acoes -->
 
+      <div class="fat-gasto">
       <div class="section-title">Gasto por categoria</div>
       <div class="card" id="fatura-categoria-card">
         <div class="cat-bar" id="fatura-cat-bar"></div>
         <div id="fatura-cat-legenda" style="margin-top:12px"></div>
       </div>
+      </div><!-- /fat-gasto -->
 
-      <div class="section-title">Lançamentos</div>
-      <div id="lista-lancamentos"><p class="empty-hint">Nenhum lançamento nesta fatura</p></div>
-      </div><!-- /col-main -->
-
-      <div class="col-side">
+      <div class="fat-parcelas">
       <div class="section-title">Compromisso de parcelas</div>
       <div id="fatura-parcelas"><p class="empty-hint">Nenhuma parcela em aberto</p></div>
-      </div><!-- /col-side -->
+      </div><!-- /fat-parcelas -->
+
+      <div class="fat-lanc">
+      <div class="section-title">Lançamentos</div>
+      <div id="lista-lancamentos"><p class="empty-hint">Nenhum lançamento nesta fatura</p></div>
+      </div><!-- /fat-lanc -->
     </main>
   </div>
 </section>
