@@ -2583,12 +2583,20 @@ window.atualizarCotacoes = async function(silencioso){
     return;
   }
   if (!silencioso) toast('Buscando cotações...');
-  const resultados = await Promise.all([
-    ...acoesFiis.map(inv => buscarCotacaoAcaoFii(inv.id, inv.ticker)),
-    ...criptos.map(inv => buscarCotacaoCripto(inv.id, inv.simbolo)),
-    ...cdis.map(inv => buscarCDI(inv.id)),
-    ...moedas.map(inv => buscarCotacaoDolar(inv.id))
-  ]);
+  // Disparo sequencial com pequena pausa entre chamadas, pra não estourar o limite
+  // de rajada (burst) da API gratuita de cotações de ações/FIIs (brapi.dev).
+  const tarefas = [
+    ...acoesFiis.map(inv => () => buscarCotacaoAcaoFii(inv.id, inv.ticker)),
+    ...criptos.map(inv => () => buscarCotacaoCripto(inv.id, inv.simbolo)),
+    ...cdis.map(inv => () => buscarCDI(inv.id)),
+    ...moedas.map(inv => () => buscarCotacaoDolar(inv.id))
+  ];
+  const PAUSA_ENTRE_CHAMADAS_MS = 400;
+  const resultados = [];
+  for (let i = 0; i < tarefas.length; i++){
+    resultados.push(await tarefas[i]());
+    if (i < tarefas.length - 1) await new Promise(r => setTimeout(r, PAUSA_ENTRE_CHAMADAS_MS));
+  }
   const falhas = resultados.filter(r => r === false).length;
   localStorage.setItem('appfin_ultima_atualizacao_cotacoes', new Date().toISOString());
   atualizarInfoCotacoes();
