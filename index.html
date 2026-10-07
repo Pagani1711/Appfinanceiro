@@ -1762,6 +1762,16 @@ function toast(msg){
   setTimeout(()=> t.classList.remove('show'), 2200);
 }
 
+// Trava o botão de salvar enquanto o envio anterior ainda está em andamento, pra evitar
+// duplo clique/toque criando o mesmo lançamento duas vezes. Retorna null se já estiver travado
+// (nesse caso o formulário deve simplesmente ignorar o novo submit).
+function travarBotaoSalvar(id){
+  const btn = document.getElementById(id);
+  if (!btn || btn.disabled) return null;
+  btn.disabled = true;
+  return btn;
+}
+
 function brl(v){
   const sign = v < 0 ? "-" : "";
   return sign + "R$ " + Math.abs(v).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
@@ -1813,6 +1823,8 @@ function renderLegendaCategoriaComDetalhe(catsOrdenadas, totalCat, itensPorCateg
 // ---------- Contas ----------
 window.salvarConta = async function(e){
   e.preventDefault();
+  const btn = travarBotaoSalvar('conta-submit-btn');
+  if (!btn) return;
   const nome = document.getElementById('conta-nome').value.trim();
   const saldo = parseFloat(document.getElementById('conta-saldo').value || 0);
   const temLimite = document.getElementById('conta-tem-limite').value === 'sim';
@@ -1831,6 +1843,8 @@ window.salvarConta = async function(e){
   }catch(err){
     console.error(err);
     toast('Erro ao salvar. Veja o console.');
+  }finally{
+    btn.disabled = false;
   }
 };
 
@@ -1964,6 +1978,8 @@ async function manterRecorrenciasEmDia(lista, colecaoNome, campoData){
 
 window.salvarDespesa = async function(e){
   e.preventDefault();
+  const btn = travarBotaoSalvar('despesa-submit-btn');
+  if (!btn) return;
   const nome = document.getElementById('despesa-nome').value.trim();
   const valor = parseFloat(document.getElementById('despesa-valor').value || 0);
   const categoria = document.getElementById('despesa-categoria').value;
@@ -2019,6 +2035,8 @@ window.salvarDespesa = async function(e){
   }catch(err){
     console.error(err);
     toast('Erro ao salvar. Veja o console.');
+  }finally{
+    btn.disabled = false;
   }
 };
 
@@ -2103,6 +2121,8 @@ window.excluirDespesa = async function(id){
 // ---------- Entradas ----------
 window.salvarEntrada = async function(e){
   e.preventDefault();
+  const btn = travarBotaoSalvar('entrada-submit-btn');
+  if (!btn) return;
   const nome = document.getElementById('entrada-nome').value.trim();
   const valor = parseFloat(document.getElementById('entrada-valor').value || 0);
   const categoria = document.getElementById('entrada-categoria').value;
@@ -2135,6 +2155,8 @@ window.salvarEntrada = async function(e){
   }catch(err){
     console.error(err);
     toast('Erro ao salvar. Veja o console.');
+  }finally{
+    btn.disabled = false;
   }
 };
 
@@ -2373,6 +2395,8 @@ function formatarData(iso){
 // ---------- Investimentos ----------
 window.salvarInvestimento = async function(e){
   e.preventDefault();
+  const btn = travarBotaoSalvar('inv-submit-btn');
+  if (!btn) return;
   const instituicao = document.getElementById('inv-instituicao').value.trim();
   const nomeAtivo = document.getElementById('inv-nome').value.trim();
   const tipo = document.getElementById('inv-tipo').value;
@@ -2450,6 +2474,8 @@ window.salvarInvestimento = async function(e){
   }catch(err){
     console.error(err);
     toast('Erro ao salvar. Veja o console.');
+  }finally{
+    btn.disabled = false;
   }
 };
 
@@ -2937,6 +2963,8 @@ function renderPatrimonio(){
 // ---------- Cartões ----------
 window.salvarCartao = async function(e){
   e.preventDefault();
+  const btn = travarBotaoSalvar('cartao-submit-btn');
+  if (!btn) return;
   const nome = document.getElementById('cartao-nome').value.trim();
   const final = document.getElementById('cartao-final').value.trim();
   const limiteTotal = parseFloat(document.getElementById('cartao-limite').value || 0);
@@ -2965,6 +2993,8 @@ window.salvarCartao = async function(e){
   }catch(err){
     console.error(err);
     toast('Erro ao salvar. Veja o console.');
+  }finally{
+    btn.disabled = false;
   }
 };
 
@@ -3345,6 +3375,8 @@ function renderFatura(){
 
 window.salvarLancamento = async function(e){
   e.preventDefault();
+  const btn = travarBotaoSalvar('lanc-submit-btn');
+  if (!btn) return;
   const descricao = document.getElementById('lanc-descricao').value.trim();
   const valor = parseFloat(document.getElementById('lanc-valor').value || 0);
   const data = document.getElementById('lanc-data').value;
@@ -3387,6 +3419,8 @@ window.salvarLancamento = async function(e){
   }catch(err){
     console.error(err);
     toast('Erro ao salvar. Veja o console.');
+  }finally{
+    btn.disabled = false;
   }
 };
 
