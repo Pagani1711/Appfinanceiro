@@ -66,8 +66,23 @@
 
   .empty-hint{ color:var(--ink-soft); font-size:12.5px; padding:14px 2px; text-align:center; }
 
-  .conta-card .barra{ height:6px; border-radius:99px; background:var(--gold-soft); margin-top:10px; overflow:hidden;}
-  .conta-card .barra-fill{ height:100%; background:var(--gold); }
+  /* usada em qualquer barra de progresso (limite de conta, reserva de emergência, metas, dívidas) */
+  .barra{ height:6px; border-radius:99px; background:var(--gold-soft); margin-top:10px; overflow:hidden;}
+  .barra-fill{ height:100%; background:var(--gold); transition:width .3s ease; }
+
+  /* ---------- Metas ---------- */
+  .meta-card{ margin-bottom:12px; }
+  .meta-semanas-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(104px,1fr)); gap:8px; }
+  .meta-semana{ background:var(--cream); border-radius:10px; padding:8px 10px; }
+  .meta-semana-lbl{ font-size:10.5px; color:var(--ink-soft); margin-bottom:5px; }
+  .meta-semana .barra{ margin-top:0; }
+  .meta-semana-val{ font-size:10.5px; color:var(--ink-soft); margin-top:5px; }
+
+  /* ---------- Dívidas ---------- */
+  .divida-card{ margin-bottom:12px; }
+  .divida-card.quitada{ opacity:.6; }
+  .divida-tag{ display:inline-block; font-size:10.5px; padding:2px 9px; border-radius:99px; background:var(--gold-soft); color:var(--gold); font-weight:600; }
+  .divida-tag.quitada{ background:var(--green); color:var(--white); }
 
   .despesa-item{
     background:var(--white); border:1px solid var(--line); border-radius:12px;
@@ -110,12 +125,13 @@
   nav.bottom-nav{
     position:fixed; bottom:0; left:50%; transform:translateX(-50%);
     width:100%; max-width:480px; background:var(--white); border-top:1px solid var(--line);
-    display:flex; z-index:50;
+    display:flex; z-index:50; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;
   }
+  nav.bottom-nav::-webkit-scrollbar{ display:none; }
   nav.bottom-nav button{
-    flex:1; background:none; border:none; padding:10px 4px 12px; cursor:pointer;
+    flex:0 0 auto; min-width:58px; background:none; border:none; padding:10px 4px 12px; cursor:pointer;
     display:flex; flex-direction:column; align-items:center; gap:5px; color:var(--ink-soft);
-    font-family:'Jost',sans-serif; font-size:10.3px;
+    font-family:'Jost',sans-serif; font-size:10.3px; white-space:nowrap;
   }
   nav.bottom-nav button.active{ color:var(--navy); font-weight:600; }
   nav.bottom-nav svg{ width:19px; height:19px; }
@@ -507,6 +523,14 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5.5" width="18" height="13" rx="2.2"/><path d="M3 9.5h18"/><path d="M6.5 14.5h4"/></svg>
       Cartões
     </a>
+    <a data-view="metas" onclick="mudarView('metas')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="0.8" fill="currentColor"/></svg>
+      Metas
+    </a>
+    <a data-view="dividas" onclick="mudarView('dividas')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M23 18l-9.5-9.5-5 5L1 6"/><path d="M17 18h6v-6"/></svg>
+      Dívidas
+    </a>
     <a onclick="fazerLogout()" style="margin-top:14px; border-top:1px solid var(--navy-mid); padding-top:14px">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
       Sair
@@ -890,6 +914,65 @@
   </div>
 </section>
 
+<!-- ===== METAS ===== -->
+<section id="view-metas" class="view">
+  <header class="app-header">
+    <p class="eyebrow">METAS</p>
+    <h1 class="page-title">Metas de gasto</h1>
+    <p class="header-sub">Defina um limite mensal por categoria ou grupo e acompanhe semana a semana</p>
+  </header>
+  <main>
+    <div class="col-main">
+    <div class="month-switch">
+      <button onclick="mudarMes(-1)">‹</button>
+      <span class="label" id="metas-mes-label">—</span>
+      <button onclick="mudarMes(1)">›</button>
+    </div>
+    <div class="section-title row-between" style="align-items:center; margin-top:12px">
+      <span>Suas metas</span>
+      <button class="btn-outline small" style="width:auto; padding:6px 14px; border-radius:99px" onclick="abrirFormMeta()">+ Nova</button>
+    </div>
+    <div id="lista-metas"><p class="empty-hint">Nenhuma meta cadastrada ainda</p></div>
+    </div><!-- /col-main -->
+  </main>
+</section>
+
+<!-- ===== DÍVIDAS ===== -->
+<section id="view-dividas" class="view">
+  <header class="app-header">
+    <p class="eyebrow">DÍVIDAS</p>
+    <h1 class="page-title">Minhas Dívidas</h1>
+    <p class="header-sub">SALDO DEVEDOR TOTAL</p>
+    <p class="big-value" id="dividas-saldo-total">R$ 0,00</p>
+  </header>
+  <main>
+    <div class="col-main">
+    <div class="kpi-strip">
+      <div class="kpi-tile tone-navy">
+        <div class="lbl">Total original</div>
+        <div class="val" id="kpi-dividas-total">R$ 0,00</div>
+        <div class="sub">soma de todas as dívidas</div>
+      </div>
+      <div class="kpi-tile tone-green">
+        <div class="lbl">Já quitado</div>
+        <div class="val" id="kpi-dividas-quitado">R$ 0,00</div>
+        <div class="sub" id="kpi-dividas-quitado-sub">0% do total</div>
+      </div>
+      <div class="kpi-tile tone-terracota">
+        <div class="lbl">Saldo devedor</div>
+        <div class="val" id="kpi-dividas-saldo">R$ 0,00</div>
+        <div class="sub">ainda a pagar</div>
+      </div>
+    </div>
+    <div class="section-title row-between" style="align-items:center">
+      <span>Suas dívidas</span>
+      <button class="btn-outline small" style="width:auto; padding:6px 14px; border-radius:99px" onclick="abrirFormDivida()">+ Nova</button>
+    </div>
+    <div id="lista-dividas"><p class="empty-hint">Nenhuma dívida cadastrada</p></div>
+    </div><!-- /col-main -->
+  </main>
+</section>
+
 <!-- ===== FORM: NOVO CARTÃO ===== -->
 <div class="overlay" id="overlay-cartao">
   <div class="sheet">
@@ -1040,6 +1123,106 @@
   </div>
 </div>
 
+<!-- ===== FORM: NOVA META ===== -->
+<div class="overlay" id="overlay-meta">
+  <div class="sheet">
+    <div class="sheet-header">
+      <button onclick="fecharForm('overlay-meta')">←</button>
+      <h2 id="meta-sheet-title">Nova meta</h2>
+    </div>
+    <form id="form-meta" onsubmit="salvarMeta(event)">
+      <div class="campo">
+        <label>O que você quer limitar?</label>
+        <div class="seg">
+          <button type="button" class="active" data-val="grupo" onclick="toggleSeg(this); toggleAlvoMeta()">Grupo</button>
+          <button type="button" data-val="categoria" onclick="toggleSeg(this); toggleAlvoMeta()">Categoria</button>
+        </div>
+        <input type="hidden" id="meta-alvo-tipo" value="grupo">
+      </div>
+      <div class="campo" id="meta-alvo-grupo-campo">
+        <label>Grupo</label>
+        <select id="meta-alvo-grupo">
+          <option>Lazer</option>
+          <option>Essencial</option>
+        </select>
+      </div>
+      <div class="campo" id="meta-alvo-categoria-campo" style="display:none">
+        <label>Categoria</label>
+        <select id="meta-alvo-categoria">
+          <option>Moradia</option>
+          <option>Alimentação/Restaurante</option>
+          <option>Padaria/Mercado</option>
+          <option>Farmácia/Saúde</option>
+          <option>Academia/Bem-estar</option>
+          <option>Lavanderia/Serviços</option>
+          <option>Viagem/Hospedagem</option>
+          <option>Compras Online</option>
+          <option>Assinaturas</option>
+          <option>Transporte/Auto</option>
+          <option>Vestuário/Beleza</option>
+          <option>Transferência Pessoal</option>
+          <option>Pet</option>
+          <option>Reembolsável Trabalho</option>
+          <option>Filhos</option>
+          <option>Impostos e Taxas</option>
+          <option>Outros</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label>Limite mensal (R$)</label>
+        <input type="number" step="0.01" inputmode="decimal" id="meta-valor-mensal" placeholder="Ex: 1000,00" required>
+        <div class="hint muted" style="margin-top:6px">O app divide esse valor pelas semanas do mês automaticamente, e acompanha o gasto real (despesas + cartão) contra esse limite, semana a semana.</div>
+      </div>
+      <button class="btn btn-primary" type="submit" id="meta-submit-btn">Salvar meta</button>
+    </form>
+  </div>
+</div>
+
+<!-- ===== FORM: NOVA DÍVIDA ===== -->
+<div class="overlay" id="overlay-divida">
+  <div class="sheet">
+    <div class="sheet-header">
+      <button onclick="fecharForm('overlay-divida')">←</button>
+      <h2 id="divida-sheet-title">Nova dívida</h2>
+    </div>
+    <form id="form-divida" onsubmit="salvarDivida(event)">
+      <div class="campo">
+        <label>Nome</label>
+        <input type="text" id="divida-nome" placeholder="Ex: Financiamento do carro" required>
+      </div>
+      <div class="campo">
+        <label>Credor / instituição</label>
+        <input type="text" id="divida-credor" placeholder="Ex: Banco XYZ (opcional)">
+      </div>
+      <div class="campo">
+        <label>Valor total da dívida (R$)</label>
+        <input type="number" step="0.01" inputmode="decimal" id="divida-valor-total" placeholder="0,00" required>
+      </div>
+      <div class="campo">
+        <label>Saldo devedor atual (R$)</label>
+        <input type="number" step="0.01" inputmode="decimal" id="divida-saldo-devedor" placeholder="Deixe em branco pra usar o valor total">
+      </div>
+      <div class="campo">
+        <label>Valor da parcela (R$) — opcional</label>
+        <input type="number" step="0.01" inputmode="decimal" id="divida-parcela-valor" placeholder="0,00">
+      </div>
+      <div class="campo">
+        <label>Parcela atual</label>
+        <input type="number" min="1" inputmode="numeric" id="divida-parcela-atual" placeholder="Ex: 1">
+      </div>
+      <div class="campo">
+        <label>Total de parcelas</label>
+        <input type="number" min="1" inputmode="numeric" id="divida-parcela-total" placeholder="Ex: 48">
+      </div>
+      <div class="campo">
+        <label>Taxa de juros ao ano (%) — opcional</label>
+        <input type="number" step="0.01" inputmode="decimal" id="divida-taxa-juros" placeholder="Ex: 18,5">
+      </div>
+      <button class="btn btn-primary" type="submit" id="divida-submit-btn">Salvar dívida</button>
+    </form>
+  </div>
+</div>
+
 <!-- ===== BOTTOM NAV ===== -->
 <nav class="bottom-nav">
   <button data-view="home" class="active" onclick="mudarView('home')">
@@ -1057,6 +1240,14 @@
   <button data-view="cartoes" onclick="mudarView('cartoes')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5.5" width="18" height="13" rx="2.2"/><path d="M3 9.5h18"/><path d="M6.5 14.5h4"/></svg>
     Cartões
+  </button>
+  <button data-view="metas" onclick="mudarView('metas')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="0.8" fill="currentColor"/></svg>
+    Metas
+  </button>
+  <button data-view="dividas" onclick="mudarView('dividas')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M23 18l-9.5-9.5-5 5L1 6"/><path d="M17 18h6v-6"/></svg>
+    Dívidas
   </button>
   <button onclick="fazerLogout()">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
@@ -1442,6 +1633,8 @@ let investimentos = [];
 let entradas = [];
 let cartoes = [];
 let lancamentosCartao = [];
+let metas = [];
+let dividas = [];
 let mesAtual = new Date(); // mês sendo visualizado na aba Contas
 let cartaoAbertoId = null;
 let mesFatura = new Date(); // mês de vencimento da fatura sendo visualizada
@@ -2193,6 +2386,7 @@ window.mudarMes = function(delta){
   mesAtual.setMonth(mesAtual.getMonth() + delta);
   mesAtual = new Date(mesAtual);
   renderDespesas();
+  renderMetas();
 };
 
 function mesChave(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
@@ -2390,6 +2584,163 @@ function formatarData(iso){
   if (!iso) return '—';
   const [y,m,dd] = iso.split('-');
   return `${dd}/${m}`;
+}
+
+// ---------- Metas ----------
+window.toggleAlvoMeta = function(){
+  const tipo = document.getElementById('meta-alvo-tipo').value;
+  document.getElementById('meta-alvo-grupo-campo').style.display = tipo === 'grupo' ? '' : 'none';
+  document.getElementById('meta-alvo-categoria-campo').style.display = tipo === 'categoria' ? '' : 'none';
+};
+
+let metaEditandoId = null;
+
+window.abrirFormMeta = function(id){
+  document.getElementById('form-meta').reset();
+  metaEditandoId = id || null;
+
+  if (id){
+    const m = metas.find(x => x.id === id);
+    if (!m) return;
+    document.getElementById('meta-sheet-title').textContent = 'Editar meta';
+    document.getElementById('meta-submit-btn').textContent = 'Salvar alterações';
+    const tipoBtn = document.querySelector('#form-meta .seg [data-val="'+m.alvoTipo+'"]');
+    if (tipoBtn) toggleSeg(tipoBtn);
+    toggleAlvoMeta();
+    if (m.alvoTipo === 'categoria') document.getElementById('meta-alvo-categoria').value = m.alvoValor;
+    else document.getElementById('meta-alvo-grupo').value = m.alvoValor;
+    document.getElementById('meta-valor-mensal').value = m.valorMensal || '';
+  } else {
+    document.getElementById('meta-sheet-title').textContent = 'Nova meta';
+    document.getElementById('meta-submit-btn').textContent = 'Salvar meta';
+    const tipoBtn = document.querySelector('#form-meta .seg [data-val="grupo"]');
+    if (tipoBtn) toggleSeg(tipoBtn);
+    toggleAlvoMeta();
+  }
+
+  document.getElementById('overlay-meta').classList.add('open');
+};
+
+window.salvarMeta = async function(e){
+  e.preventDefault();
+  const btn = travarBotaoSalvar('meta-submit-btn');
+  if (!btn) return;
+  const alvoTipo = document.getElementById('meta-alvo-tipo').value;
+  const alvoValor = alvoTipo === 'categoria'
+    ? document.getElementById('meta-alvo-categoria').value
+    : document.getElementById('meta-alvo-grupo').value;
+  const valorMensal = parseFloat(document.getElementById('meta-valor-mensal').value || 0);
+  try{
+    if (metaEditandoId){
+      await updateDoc(doc(db, 'metas', metaEditandoId), { alvoTipo, alvoValor, valorMensal });
+      toast('Meta atualizada!');
+    } else {
+      await addDoc(collection(db, 'metas'), { alvoTipo, alvoValor, valorMensal, userId: usuarioAtual.uid, criadoEm: serverTimestamp() });
+      toast('Meta salva!');
+    }
+    document.getElementById('form-meta').reset();
+    fecharForm('overlay-meta');
+    metaEditandoId = null;
+  }catch(err){
+    console.error(err);
+    toast('Erro ao salvar. Veja o console.');
+  }finally{
+    btn.disabled = false;
+  }
+};
+
+window.excluirMeta = async function(id){
+  if (!confirm('Excluir esta meta?')) return;
+  await deleteDoc(doc(db, 'metas', id));
+  toast('Meta excluída');
+};
+
+// quantas "semanas" (blocos de 7 dias) um mês tem, pra dividir a meta mensal igualmente entre elas
+function numSemanasNoMes(chaveMes){
+  const [ano, mes] = chaveMes.split('-').map(Number);
+  const diasNoMes = new Date(ano, mes, 0).getDate();
+  return Math.ceil(diasNoMes / 7);
+}
+
+// Soma o gasto real (despesas avulsas/fixas + itens de fatura de cartão) que bate com o alvo da meta
+// (grupo ou categoria específica) dentro do mês informado, já dividido por semana do mês.
+// Pra itens de cartão parcelados, usa o dia do mês da compra original como proxy de "semana" —
+// não é exato pro parcelamento, mas mantém o mesmo dia todo mês, igual uma despesa fixa faria.
+function calcularGastoMeta(meta, chaveMes){
+  const bateAlvo = (categoria, grupo) => meta.alvoTipo === 'categoria'
+    ? categoria === meta.alvoValor
+    : (grupo || CATEGORIA_GRUPO[categoria] || 'Essencial') === meta.alvoValor;
+
+  const itens = [];
+  despesas.filter(d => (d.vencimento||'').startsWith(chaveMes) && bateAlvo(d.categoria, d.grupo))
+    .forEach(d => itens.push({ valor: d.valor||0, dia: parseInt((d.vencimento||'').split('-')[2]||'1',10) }));
+  cartoes.forEach(cart => {
+    itensDaFaturaPara(cart.id, chaveMes).filter(it => bateAlvo(it.categoria, it.grupo))
+      .forEach(it => itens.push({ valor: it.valor||0, dia: parseInt((it.data||'').split('-')[2]||'1',10) }));
+  });
+
+  const numSemanas = numSemanasNoMes(chaveMes);
+  const porSemana = Array(numSemanas).fill(0);
+  let total = 0;
+  itens.forEach(it => {
+    total += it.valor;
+    const idx = Math.min(numSemanas-1, Math.max(0, Math.floor((Math.max(1,it.dia)-1)/7)));
+    porSemana[idx] += it.valor;
+  });
+  const valorSemana = meta.valorMensal / numSemanas;
+  return { total, porSemana, numSemanas, valorSemana };
+}
+
+function corProgresso(pct){
+  return pct <= 80 ? 'var(--green)' : pct <= 100 ? 'var(--gold)' : 'var(--terracota)';
+}
+
+function renderMetas(){
+  const el = document.getElementById('lista-metas');
+  if (!el) return;
+  const chave = mesChave(mesAtual);
+  const lblEl = document.getElementById('metas-mes-label');
+  if (lblEl) lblEl.textContent = NOMES_MES[mesAtual.getMonth()] + '/' + mesAtual.getFullYear();
+
+  if (metas.length === 0){
+    el.innerHTML = '<p class="empty-hint">Nenhuma meta cadastrada ainda</p>';
+    return;
+  }
+
+  el.innerHTML = metas.map(m => {
+    const { total, porSemana, valorSemana } = calcularGastoMeta(m, chave);
+    const pct = m.valorMensal > 0 ? (total/m.valorMensal*100) : 0;
+    const cor = corProgresso(pct);
+    const semanasHtml = porSemana.map((gastoSemana,i) => {
+      const pctSemana = valorSemana > 0 ? (gastoSemana/valorSemana*100) : 0;
+      const corSemana = corProgresso(pctSemana);
+      return `
+        <div class="meta-semana">
+          <div class="meta-semana-lbl">Semana ${i+1}</div>
+          <div class="barra"><div class="barra-fill" style="width:${Math.min(100,pctSemana)}%; background:${corSemana}"></div></div>
+          <div class="meta-semana-val">${brl(gastoSemana)} / ${brl(valorSemana)}</div>
+        </div>`;
+    }).join('');
+    return `
+      <div class="card meta-card">
+        <div class="row-between">
+          <div>
+            <div style="font-weight:600;font-size:15px">${m.alvoValor}</div>
+            <div class="muted" style="font-size:11.5px">${m.alvoTipo === 'grupo' ? 'Grupo' : 'Categoria'}</div>
+          </div>
+          <div style="display:flex; gap:6px">
+            <button class="del-btn" onclick="abrirFormMeta('${m.id}')">✏️</button>
+            <button class="del-btn" onclick="excluirMeta('${m.id}')">✕</button>
+          </div>
+        </div>
+        <div class="row-between" style="margin-top:12px">
+          <span class="muted">Gasto do mês</span>
+          <span class="mono" style="color:${cor}">${brl(total)} / ${brl(m.valorMensal)} (${pct.toFixed(0)}%)</span>
+        </div>
+        <div class="barra"><div class="barra-fill" style="width:${Math.min(100,pct)}%; background:${cor}"></div></div>
+        <div class="meta-semanas-grid" style="margin-top:14px">${semanasHtml}</div>
+      </div>`;
+  }).join('');
 }
 
 // ---------- Investimentos ----------
@@ -4486,6 +4837,158 @@ window.recuperarSenha = async function(e){
   return false;
 };
 
+// ---------- Dívidas ----------
+let dividaEditandoId = null;
+
+window.abrirFormDivida = function(id){
+  document.getElementById('form-divida').reset();
+  dividaEditandoId = id || null;
+
+  if (id){
+    const d = dividas.find(x => x.id === id);
+    if (!d) return;
+    document.getElementById('divida-sheet-title').textContent = 'Editar dívida';
+    document.getElementById('divida-submit-btn').textContent = 'Salvar alterações';
+    document.getElementById('divida-nome').value = d.nome || '';
+    document.getElementById('divida-credor').value = d.credor || '';
+    document.getElementById('divida-valor-total').value = d.valorTotal ?? '';
+    document.getElementById('divida-saldo-devedor').value = d.saldoDevedor ?? '';
+    document.getElementById('divida-parcela-valor').value = d.parcelaValor ?? '';
+    document.getElementById('divida-parcela-atual').value = d.parcelaAtual ?? '';
+    document.getElementById('divida-parcela-total').value = d.parcelaTotal ?? '';
+    document.getElementById('divida-taxa-juros').value = d.taxaJurosAnual ?? '';
+  } else {
+    document.getElementById('divida-sheet-title').textContent = 'Nova dívida';
+    document.getElementById('divida-submit-btn').textContent = 'Salvar dívida';
+  }
+
+  document.getElementById('overlay-divida').classList.add('open');
+};
+
+window.salvarDivida = async function(e){
+  e.preventDefault();
+  const btn = travarBotaoSalvar('divida-submit-btn');
+  if (!btn) return;
+  const nome = document.getElementById('divida-nome').value.trim();
+  const credor = document.getElementById('divida-credor').value.trim();
+  const valorTotal = parseFloat(document.getElementById('divida-valor-total').value || 0);
+  const saldoDevedorStr = document.getElementById('divida-saldo-devedor').value;
+  const saldoDevedor = saldoDevedorStr !== '' ? parseFloat(saldoDevedorStr) : valorTotal;
+  const parcelaValorStr = document.getElementById('divida-parcela-valor').value;
+  const parcelaValor = parcelaValorStr !== '' ? parseFloat(parcelaValorStr) : null;
+  const parcelaAtualStr = document.getElementById('divida-parcela-atual').value;
+  const parcelaAtual = parcelaAtualStr !== '' ? parseInt(parcelaAtualStr,10) : null;
+  const parcelaTotalStr = document.getElementById('divida-parcela-total').value;
+  const parcelaTotal = parcelaTotalStr !== '' ? parseInt(parcelaTotalStr,10) : null;
+  const taxaJurosStr = document.getElementById('divida-taxa-juros').value;
+  const taxaJurosAnual = taxaJurosStr !== '' ? parseFloat(taxaJurosStr) : null;
+  const quitada = saldoDevedor <= 0;
+  const dados = { nome, credor, valorTotal, saldoDevedor, parcelaValor, parcelaAtual, parcelaTotal, taxaJurosAnual, quitada, userId: usuarioAtual.uid };
+  try{
+    if (dividaEditandoId){
+      await updateDoc(doc(db, 'dividas', dividaEditandoId), dados);
+      toast('Dívida atualizada!');
+    } else {
+      await addDoc(collection(db, 'dividas'), { ...dados, criadoEm: serverTimestamp() });
+      toast('Dívida salva!');
+    }
+    document.getElementById('form-divida').reset();
+    fecharForm('overlay-divida');
+    dividaEditandoId = null;
+  }catch(err){
+    console.error(err);
+    toast('Erro ao salvar. Veja o console.');
+  }finally{
+    btn.disabled = false;
+  }
+};
+
+window.excluirDivida = async function(id){
+  if (!confirm('Excluir esta dívida?')) return;
+  await deleteDoc(doc(db, 'dividas', id));
+  toast('Dívida excluída');
+};
+
+window.registrarPagamentoDivida = async function(id){
+  const d = dividas.find(x => x.id === id);
+  if (!d) return;
+  const valorStr = prompt(`Pagamento de "${d.nome}" — valor (R$):`, d.parcelaValor || '');
+  if (!valorStr) return;
+  const valor = parseFloat(valorStr.replace(',','.'));
+  if (isNaN(valor) || valor <= 0){ toast('Valor inválido'); return; }
+  const novoSaldo = Math.max(0, (d.saldoDevedor||0) - valor);
+  const dados = { saldoDevedor: novoSaldo, quitada: novoSaldo <= 0 };
+  if (d.parcelaTotal){
+    dados.parcelaAtual = Math.min(d.parcelaTotal, (d.parcelaAtual||0) + 1);
+  }
+  try{
+    await updateDoc(doc(db, 'dividas', id), dados);
+    toast(novoSaldo <= 0 ? `Dívida quitada! 🎉` : `Pagamento de ${brl(valor)} registrado — restam ${brl(novoSaldo)}`);
+  }catch(err){
+    console.error(err);
+    toast('Erro ao registrar. Veja o console.');
+  }
+};
+
+function renderDividas(){
+  const el = document.getElementById('lista-dividas');
+  if (!el) return;
+
+  const valorTotalGeral = dividas.reduce((s,d)=> s + (d.valorTotal||0), 0);
+  const saldoTotalGeral = dividas.reduce((s,d)=> s + (d.saldoDevedor||0), 0);
+  const quitadoGeral = valorTotalGeral - saldoTotalGeral;
+  const pctQuitadoGeral = valorTotalGeral > 0 ? (quitadoGeral/valorTotalGeral*100) : 0;
+
+  const totalEl = document.getElementById('dividas-saldo-total');
+  if (totalEl) totalEl.textContent = brl(saldoTotalGeral);
+  const kpiTotalEl = document.getElementById('kpi-dividas-total');
+  if (kpiTotalEl) kpiTotalEl.textContent = brl(valorTotalGeral);
+  const kpiQuitadoEl = document.getElementById('kpi-dividas-quitado');
+  if (kpiQuitadoEl) kpiQuitadoEl.textContent = brl(quitadoGeral);
+  const kpiQuitadoSubEl = document.getElementById('kpi-dividas-quitado-sub');
+  if (kpiQuitadoSubEl) kpiQuitadoSubEl.textContent = `${pctQuitadoGeral.toFixed(0)}% do total`;
+  const kpiSaldoEl = document.getElementById('kpi-dividas-saldo');
+  if (kpiSaldoEl) kpiSaldoEl.textContent = brl(saldoTotalGeral);
+
+  if (dividas.length === 0){
+    el.innerHTML = '<p class="empty-hint">Nenhuma dívida cadastrada</p>';
+    return;
+  }
+
+  const ordenadas = [...dividas].sort((a,b)=> (a.quitada?1:0) - (b.quitada?1:0) || (b.saldoDevedor||0) - (a.saldoDevedor||0));
+
+  el.innerHTML = ordenadas.map(d => {
+    const valorTotal = d.valorTotal||0;
+    const saldoDevedor = d.saldoDevedor||0;
+    const pago = valorTotal - saldoDevedor;
+    const pct = valorTotal > 0 ? (pago/valorTotal*100) : 0;
+    const cor = d.quitada ? 'var(--green)' : corProgresso(100-pct); // quanto mais falta, mais "quente" a cor
+    return `
+      <div class="card divida-card ${d.quitada ? 'quitada' : ''}">
+        <div class="row-between">
+          <div>
+            <div style="font-weight:600;font-size:15px">${d.nome}</div>
+            ${d.credor ? `<div class="muted" style="font-size:11.5px">${d.credor}</div>` : ''}
+          </div>
+          <div style="display:flex; gap:6px; align-items:center">
+            <span class="divida-tag ${d.quitada ? 'quitada' : ''}">${d.quitada ? 'Quitada' : 'Ativa'}</span>
+            <button class="del-btn" onclick="abrirFormDivida('${d.id}')">✏️</button>
+            <button class="del-btn" onclick="excluirDivida('${d.id}')">✕</button>
+          </div>
+        </div>
+        <div class="row-between" style="margin-top:12px">
+          <span class="muted">Quitado</span>
+          <span class="mono" style="color:${cor}">${brl(pago)} / ${brl(valorTotal)} (${pct.toFixed(0)}%)</span>
+        </div>
+        <div class="barra"><div class="barra-fill" style="width:${Math.min(100,pct)}%; background:${cor}"></div></div>
+        <div class="muted" style="margin-top:10px">Saldo devedor: <span class="mono" style="color:var(--terracota)">${brl(saldoDevedor)}</span></div>
+        ${d.parcelaTotal ? `<div class="muted" style="margin-top:2px">Parcela: <span class="mono">${d.parcelaAtual||0}/${d.parcelaTotal}</span>${d.parcelaValor ? ` · ${brl(d.parcelaValor)}/mês` : ''}</div>` : ''}
+        ${d.taxaJurosAnual ? `<div class="muted" style="margin-top:2px">Juros: <span class="mono">${d.taxaJurosAnual}% a.a.</span></div>` : ''}
+        ${!d.quitada ? `<button class="btn btn-outline" style="margin-top:12px" onclick="registrarPagamentoDivida('${d.id}')">Registrar pagamento</button>` : ''}
+      </div>`;
+  }).join('');
+}
+
 function pararListeners(){
   unsubscribers.forEach(unsub => unsub());
   unsubscribers = [];
@@ -4493,6 +4996,7 @@ function pararListeners(){
 
 function limparEstadoLocal(){
   contas = []; despesas = []; investimentos = []; entradas = []; cartoes = []; lancamentosCartao = [];
+  metas = []; dividas = [];
   cartaoAbertoId = null;
 }
 
@@ -4508,6 +5012,7 @@ function iniciarListeners(uid){
   unsubscribers.push(onSnapshot(query(collection(db, 'despesas'), where('userId','==',uid), orderBy('vencimento','asc')), snap => {
     despesas = snap.docs.map(d => ({ id:d.id, ...d.data() }));
     renderDespesas();
+    renderMetas();
     manterRecorrenciasEmDia(despesas, 'despesas', 'vencimento');
   }, err => console.error('despesas:', err)));
 
@@ -4530,6 +5035,7 @@ function iniciarListeners(uid){
     renderCartoes();
     if (cartaoAbertoId) renderFatura();
     renderDespesas();
+    renderMetas();
   }, err => console.error('cartoes:', err)));
 
   unsubscribers.push(onSnapshot(query(collection(db, 'lancamentosCartao'), where('userId','==',uid), orderBy('data','desc')), snap => {
@@ -4537,9 +5043,20 @@ function iniciarListeners(uid){
     renderCartoes();
     if (cartaoAbertoId) renderFatura();
     renderDespesas();
+    renderMetas();
     migrarLancamentosFixosCartao();
     manterRecorrenciasEmDia(lancamentosCartao, 'lancamentosCartao', 'data');
   }, err => console.error('lancamentosCartao:', err)));
+
+  unsubscribers.push(onSnapshot(query(collection(db, 'metas'), where('userId','==',uid), orderBy('criadoEm','asc')), snap => {
+    metas = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+    renderMetas();
+  }, err => console.error('metas:', err)));
+
+  unsubscribers.push(onSnapshot(query(collection(db, 'dividas'), where('userId','==',uid), orderBy('criadoEm','asc')), snap => {
+    dividas = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+    renderDividas();
+  }, err => console.error('dividas:', err)));
 }
 
 onAuthStateChanged(auth, (user) => {
