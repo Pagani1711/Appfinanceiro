@@ -5048,15 +5048,27 @@ function iniciarListeners(uid){
     manterRecorrenciasEmDia(lancamentosCartao, 'lancamentosCartao', 'data');
   }, err => console.error('lancamentosCartao:', err)));
 
-  unsubscribers.push(onSnapshot(query(collection(db, 'metas'), where('userId','==',uid), orderBy('criadoEm','asc')), snap => {
-    metas = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+  // metas/dividas: só filtra por userId (sem orderBy no servidor) de propósito — combinar where+orderBy em
+  // campos diferentes exige um índice composto no Firestore, que não existe pra coleções novas até ser criado
+  // manualmente no console. Ordena aqui no próprio app pra não depender disso.
+  unsubscribers.push(onSnapshot(query(collection(db, 'metas'), where('userId','==',uid)), snap => {
+    metas = snap.docs.map(d => ({ id:d.id, ...d.data() })).sort(porCriadoEmAsc);
     renderMetas();
   }, err => console.error('metas:', err)));
 
-  unsubscribers.push(onSnapshot(query(collection(db, 'dividas'), where('userId','==',uid), orderBy('criadoEm','asc')), snap => {
-    dividas = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+  unsubscribers.push(onSnapshot(query(collection(db, 'dividas'), where('userId','==',uid)), snap => {
+    dividas = snap.docs.map(d => ({ id:d.id, ...d.data() })).sort(porCriadoEmAsc);
     renderDividas();
   }, err => console.error('dividas:', err)));
+}
+
+// Ordena por criadoEm (Timestamp do Firestore) sem precisar de orderBy no servidor — usado pra metas/dividas,
+// que são filtradas só por userId pra não exigir índice composto. Documento recém-criado (antes do servidor
+// confirmar o serverTimestamp) ainda não tem criadoEm resolvido — tratado como "mais antigo" até sincronizar.
+function porCriadoEmAsc(a, b){
+  const ta = a.criadoEm && typeof a.criadoEm.toMillis === 'function' ? a.criadoEm.toMillis() : 0;
+  const tb = b.criadoEm && typeof b.criadoEm.toMillis === 'function' ? b.criadoEm.toMillis() : 0;
+  return ta - tb;
 }
 
 onAuthStateChanged(auth, (user) => {
