@@ -255,7 +255,11 @@
   .db-donuts{ display:none; }
   .home-col-main, .home-col-side{ min-width:0; }
   .teto-linha{ display:flex; align-items:center; gap:10px; padding:6px 0; font-size:13px; }
-  .teto-linha .teto-mes{ width:44px; color:var(--muted); font-weight:600; }
+  .teto-linha .teto-mes{ width:44px; color:var(--ink-soft); font-weight:600; }
+  .teto-clicavel{ cursor:pointer; }
+  .teto-toggle{ margin-top:8px; font-size:12px; color:var(--ink-soft); cursor:pointer; }
+  .teto-grupo{ font-size:11px; font-weight:600; color:var(--ink-soft); padding:6px 0 2px; text-transform:uppercase; letter-spacing:.04em; }
+  .teto-nota{ font-style:italic; opacity:.8; }
   .teto-linha .barra{ flex:1; height:6px; }
   .teto-linha .teto-val{ min-width:78px; text-align:right; }
   .teto-aviso{ margin-top:8px; padding:8px 10px; border-radius:8px; font-size:12.5px; background:rgba(0,0,0,.04); line-height:1.4; }
@@ -380,9 +384,7 @@
     #view-home .db-quote .quote-card{ padding:14px 18px; }
     #view-home .home-col-main{ grid-column:1; grid-row:2; display:flex; flex-direction:column; gap:16px; }
     #view-home .home-col-side{ grid-column:2; grid-row:2; display:flex; flex-direction:column; gap:16px; }
-    #view-home .db-distribuicao{ grid-column:1; grid-row:3; }
-    #view-home .db-comparativo{ grid-column:2; grid-row:3; }
-    #view-home .db-donuts{ grid-column:1 / -1; grid-row:4; display:block; }
+    #view-home .db-donuts{ grid-column:1 / -1; grid-row:3; display:block; }
     #view-home .kpi-strip{ margin-bottom:0; gap:12px; grid-template-columns:repeat(5,1fr); }
     #view-home .proj-meses-cards{ grid-template-columns:repeat(auto-fit, minmax(235px, 1fr)); }
     @media (max-width:1199px){
@@ -391,9 +393,9 @@
       /* telas menores: uma coluna só (lateral vem depois da principal) */
       #view-home.active{ grid-template-columns:minmax(0,1fr); }
       #view-home header.app-header, #view-home .db-quote, #view-home .home-col-main, #view-home .home-col-side,
-      #view-home .db-distribuicao, #view-home .db-comparativo, #view-home .db-donuts{ grid-column:1; grid-row:auto; }
+      #view-home .db-donuts{ grid-column:1; grid-row:auto; }
       #view-home header.app-header{ order:1; } #view-home .db-quote{ order:2; } #view-home .home-col-main{ order:3; }
-      #view-home .home-col-side{ order:4; } #view-home .db-distribuicao{ order:5; } #view-home .db-comparativo{ order:6; } #view-home .db-donuts{ order:7; }
+      #view-home .home-col-side{ order:4; } #view-home .db-donuts{ order:5; }
     }
     #view-home .kpi-tile{ padding:16px 16px; }
     #view-home .kpi-tile .val{ font-size:clamp(14px, 1.2vw, 19px); white-space:nowrap; }
@@ -603,6 +605,19 @@
 
       <div class="proj-meses-cards" id="proj-meses-cards"></div>
     </div>
+
+    <div class="db-block db-distribuicao">
+      <div class="section-title row-between" style="align-items:center">
+        <span>Distribuição do mês</span>
+        <div class="month-switch" style="margin:0; gap:8px">
+          <button onclick="mudarMesDistribuicao(-1)">‹</button>
+          <span class="label" id="distrib-mes-label" style="min-width:auto; font-size:12px">—</span>
+          <button onclick="mudarMesDistribuicao(1)">›</button>
+        </div>
+      </div>
+      <div class="muted" style="margin:-6px 2px 12px; font-size:11.5px">Meta: 70% Essencial · 20% Lazer · 10% Investimento</div>
+      <div id="home-distribuicao"></div>
+    </div>
     </div><!-- /home-col-main -->
 
     <div class="home-col-side">
@@ -640,7 +655,6 @@
       <div class="section-title">Teto de parcelas</div>
       <div class="card" id="home-teto-parcelas"><p class="empty-hint">Carregando…</p></div>
     </div>
-    </div><!-- /home-col-side -->
 
     <div class="db-block db-comparativo">
       <div class="section-title">Comparado ao mês anterior</div>
@@ -649,23 +663,11 @@
         <div class="muted" style="margin-top:6px" id="home-comp-texto"></div>
       </div>
     </div>
+    </div><!-- /home-col-side -->
 
     <div class="db-block db-quote">
       <div class="section-title">Para pensar</div>
       <div class="quote-card" id="home-quote">—</div>
-    </div>
-
-    <div class="db-block db-distribuicao">
-      <div class="section-title row-between" style="align-items:center">
-        <span>Distribuição do mês</span>
-        <div class="month-switch" style="margin:0; gap:8px">
-          <button onclick="mudarMesDistribuicao(-1)">‹</button>
-          <span class="label" id="distrib-mes-label" style="min-width:auto; font-size:12px">—</span>
-          <button onclick="mudarMesDistribuicao(1)">›</button>
-        </div>
-      </div>
-      <div class="muted" style="margin:-6px 2px 12px; font-size:11.5px">Meta: 70% Essencial · 20% Lazer · 10% Investimento</div>
-      <div id="home-distribuicao"></div>
     </div>
 
     <div class="db-block db-donuts">
@@ -4597,25 +4599,73 @@ function tetoParcelasDoMes(chave){
 // Parcelas já existentes num mês, separadas por origem: despesas parceladas, cartão parcelado, parcela de dívidas
 function parcelasDoMes(chave, ignorarDividaId){
   let contas_ = 0, cartao = 0, divs = 0;
+  const itens = { contas:[], cartao:[], dividas:[], semDados:[] };
   despesas.forEach(d => {
-    if ((d.finita || d.parcelaTotal > 1) && (d.vencimento||'').startsWith(chave)) contas_ += d.valor||0;
+    if ((d.finita || d.parcelaTotal > 1) && (d.vencimento||'').startsWith(chave)){
+      contas_ += d.valor||0;
+      itens.contas.push({ nome: d.nome||'Conta', valor: d.valor||0,
+        info: d.parcelaTotal > 1 ? `parcela ${d.parcelaAtual||'?'}/${d.parcelaTotal}` : 'finita' });
+    }
   });
-  cartoes.forEach(c => itensDaFaturaPara(c.id, chave).forEach(it => {
-    if (it.parcelaTotal > 1) cartao += it.valor||0;
-  }));
+  const [ca, cm] = chave.split('-').map(Number);
+  const refFatura = NOMES_MES[(new Date(ca, cm-2, 1)).getMonth()]; // fatura "de Outubro" vence em Novembro
+  cartoes.forEach(c => {
+    const todos = itensDaFaturaPara(c.id, chave);
+    const parc = todos.filter(it => it.parcelaTotal > 1);
+    parc.forEach(it => {
+      cartao += it.valor||0;
+      itens.cartao.push({ nome: it.descricao||'Compra', valor: it.valor||0,
+        info: `${c.nome||'Cartão'} · fatura de ${refFatura} · ${it.parcelaAtual}/${it.parcelaTotal}` });
+    });
+    if (todos.length){
+      const tot = todos.reduce((x,it)=> x + (it.valor||0), 0);
+      const ps = parc.reduce((x,it)=> x + (it.valor||0), 0);
+      itens.cartao.push({ nota:true, nome: `${c.nome||'Cartão'} — fatura de ${refFatura} inteira`, valor: tot,
+        info: `só os parcelados (${brl(ps)}) entram no teto` });
+    }
+  });
   const off = deslocamentoMeses(chave);
   if (off >= 0){
     dividas.forEach(d => {
-      if (d.quitada || !d.parcelaValor || d.id === ignorarDividaId) return;
+      if (d.quitada || d.id === ignorarDividaId) return;
+      if (!d.parcelaValor){ itens.semDados.push({ nome: d.nome||d.credor||'Dívida', info: 'sem valor de parcela — não entra na conta' }); return; }
+      const nomeD = d.nome||d.credor||'Dívida';
       if (d.parcelaTotal){
         const restantes = d.parcelaTotal - (d.parcelaAtual||0);
-        if (off < restantes) divs += d.parcelaValor;
+        if (off < restantes){
+          divs += d.parcelaValor;
+          itens.dividas.push({ nome: nomeD, valor: d.parcelaValor, info: `parcela ${(d.parcelaAtual||0)+off+1}/${d.parcelaTotal}` });
+        }
       } else {
         divs += d.parcelaValor; // sem total informado: não dá pra saber quando acaba, conta todo mês
+        itens.dividas.push({ nome: nomeD, valor: d.parcelaValor, info: 'sem total de parcelas — conta todo mês' });
       }
     });
   }
-  return { contas: contas_, cartao, dividas: divs, total: contas_ + cartao + divs };
+  return { contas: contas_, cartao, dividas: divs, total: contas_ + cartao + divs, itens };
+}
+
+function escapeHtml(t){ return String(t==null?'':t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+let tetoMesesExpandidos = new Set();
+function toggleTetoMes(ch){
+  if (tetoMesesExpandidos.has(ch)) tetoMesesExpandidos.delete(ch); else tetoMesesExpandidos.add(ch);
+  renderTetoParcelas();
+}
+function tetoDetalheHtml(p){
+  const grupos = [['Contas parceladas', p.itens.contas], ['Cartão (parcelados)', p.itens.cartao], ['Dívidas', p.itens.dividas]];
+  let h = '';
+  grupos.forEach(([titulo, lista]) => {
+    if (!lista.length) return;
+    h += `<div class="teto-grupo">${titulo}</div>`;
+    lista.forEach(it => {
+      h += `<div class="cat-detalhe-item${it.nota ? ' teto-nota' : ''}"><span class="nome">${escapeHtml(it.nome)} <span class="muted">${escapeHtml(it.info||'')}</span></span><span class="valor">${brl(it.valor)}</span></div>`;
+    });
+  });
+  if (p.itens.semDados.length){
+    h += `<div class="teto-grupo">Dívidas fora da conta</div>`;
+    p.itens.semDados.forEach(it => { h += `<div class="cat-detalhe-item"><span class="nome">${escapeHtml(it.nome)} <span class="muted">${escapeHtml(it.info)}</span></span></div>`; });
+  }
+  return h || '<div class="cat-detalhe-item"><span class="nome muted">Nenhuma parcela neste mês.</span></div>';
 }
 
 function renderTetoParcelas(){
@@ -4640,11 +4690,13 @@ function renderTetoParcelas(){
     html += `<div class="barra" style="margin-top:8px"><div class="barra-fill" style="width:${Math.min(100,pct)}%;background:${cor}"></div></div>`;
     html += `<div class="muted" style="font-size:12.5px;margin-top:6px">${sobra >= 0 ? `Cabem mais ${brl(sobra)} em parcelas novas.` : `Acima do teto em ${brl(-sobra)} — melhor esperar uma parcela acabar.`} · teto = ${Math.round(TETO_PARCELAS_PCT*100)}% da receita (${brl(rec0)})</div>`;
   }
-  // origem das parcelas do mês
   const partes = [['Contas', p0.contas], ['Cartão', p0.cartao], ['Dívidas', p0.dividas]].filter(x => x[1] > 0);
   if (partes.length){
     html += `<div class="muted" style="font-size:12.5px;margin-top:8px">${partes.map(x => `${x[0]} <span class="mono">${brl(x[1])}</span>`).join(' · ')}</div>`;
   }
+  const abertoAtual = tetoMesesExpandidos.has(chave0);
+  html += `<div class="teto-toggle" onclick="toggleTetoMes('${chave0}')">${abertoAtual ? 'Ocultar' : 'Ver'} o que compõe este mês <span class="cat-seta ${abertoAtual?'aberto':''}">▼</span></div>`;
+  html += `<div class="cat-detalhe ${abertoAtual?'aberto':''}">${tetoDetalheHtml(p0)}</div>`;
   // próximos meses
   let linhas = '';
   let anterior = p0.total;
@@ -4655,15 +4707,18 @@ function renderTetoParcelas(){
     const teto = tetoParcelasDoMes(ch);
     const pct = teto > 0 ? (p.total / teto) * 100 : 0;
     const libera = anterior - p.total;
-    linhas += `<div class="teto-linha">
+    const aberto = tetoMesesExpandidos.has(ch);
+    linhas += `<div class="teto-linha teto-clicavel" onclick="toggleTetoMes('${ch}')">
       <span class="teto-mes">${NOMES_MES[d.getMonth()].slice(0,3)}</span>
       <div class="barra"><div class="barra-fill" style="width:${Math.min(100,pct)}%;background:${corProgresso(pct)}"></div></div>
       <span class="teto-val mono">${brl(p.total)}</span>
       <span class="muted" style="min-width:74px;font-size:11.5px">${libera > 0.005 ? '↓ libera '+brl(libera) : ''}</span>
-    </div>`;
+      <span class="cat-seta ${aberto?'aberto':''}">▼</span>
+    </div>
+    <div class="cat-detalhe ${aberto?'aberto':''}">${tetoDetalheHtml(p)}</div>`;
     anterior = p.total;
   }
-  html += `<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:8px"><div class="muted" style="font-size:12px;margin-bottom:2px">Próximos meses</div>${linhas}</div>`;
+  html += `<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:8px"><div class="muted" style="font-size:12px;margin-bottom:2px">Próximos meses · toque num mês para ver o que compõe</div>${linhas}</div>`;
   el.innerHTML = html;
 }
 
