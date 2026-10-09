@@ -254,6 +254,12 @@
   .fluxo-grafico-card{ display:none; }
   .db-donuts{ display:none; }
   .home-col-main, .home-col-side{ min-width:0; }
+  .teto-linha{ display:flex; align-items:center; gap:10px; padding:6px 0; font-size:13px; }
+  .teto-linha .teto-mes{ width:44px; color:var(--muted); font-weight:600; }
+  .teto-linha .barra{ flex:1; height:6px; }
+  .teto-linha .teto-val{ min-width:78px; text-align:right; }
+  .teto-aviso{ margin-top:8px; padding:8px 10px; border-radius:8px; font-size:12.5px; background:rgba(0,0,0,.04); line-height:1.4; }
+  .teto-aviso.over{ background:rgba(192,86,60,.12); color:var(--terracota); }
 
   .fluxo-card-inner{ background:var(--white); border:1px solid var(--line); border-radius:14px; padding:16px 18px; margin-bottom:14px; }
   .fluxo-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:14px; margin-bottom:12px; }
@@ -409,6 +415,7 @@
     #view-home .db-vencimentos .despesa-item{ border:none; border-radius:0; margin-bottom:0; padding:12px 0; border-bottom:1px solid var(--line); }
     #view-home .db-vencimentos .despesa-item:last-child{ border-bottom:none; }
     #view-home .db-categoria .card{ border-left-color:var(--terracota); }
+    #view-home .db-teto-parcelas .card{ border-left-color:var(--gold); }
     #view-home .db-comparativo .card{ border-left-color:var(--navy); }
     #view-home .db-distribuicao .card{ border-left-color:var(--gold); }
     #view-home .db-donuts #donut-receitas{ border-left-color:var(--green); }
@@ -627,6 +634,11 @@
         <div class="cat-bar" id="home-cat-bar"></div>
         <div id="home-cat-legenda" style="margin-top:12px"></div>
       </div>
+    </div>
+
+    <div class="db-block db-teto-parcelas">
+      <div class="section-title">Teto de parcelas</div>
+      <div class="card" id="home-teto-parcelas"><p class="empty-hint">Carregando…</p></div>
     </div>
     </div><!-- /home-col-side -->
 
@@ -1117,6 +1129,7 @@
       <div class="campo" id="lanc-parcela-total-campo" style="display:none">
         <label>Total de parcelas</label>
         <input type="number" min="1" inputmode="numeric" id="lanc-parcela-total" placeholder="Ex: 5">
+        <div class="teto-aviso" id="aviso-teto-lanc" style="display:none"></div>
       </div>
       <button class="btn btn-primary" type="submit" id="lanc-submit-btn">Salvar lançamento</button>
     </form>
@@ -1213,6 +1226,7 @@
       <div class="campo">
         <label>Total de parcelas</label>
         <input type="number" min="1" inputmode="numeric" id="divida-parcela-total" placeholder="Ex: 48">
+        <div class="teto-aviso" id="aviso-teto-divida" style="display:none"></div>
       </div>
       <div class="campo">
         <label>Taxa de juros ao ano (%) — opcional</label>
@@ -1355,6 +1369,7 @@
         <label>Em quantas parcelas</label>
         <input type="number" min="2" inputmode="numeric" id="despesa-parcelas-total" placeholder="Ex: 4">
         <div class="hint muted" style="margin-top:6px">Repete o mesmo valor todo mês, por essa quantidade de vezes.</div>
+        <div class="teto-aviso" id="aviso-teto-despesa" style="display:none"></div>
       </div>
       <div class="campo">
         <label>Grupo</label>
@@ -2517,6 +2532,8 @@ function renderProjecaoMes(chave, doMes){
   const saldoEl = document.getElementById('mes-proj-saldo');
   saldoEl.textContent = brl(saldoAcumulado);
   saldoEl.style.color = saldoAcumulado >= 0 ? 'var(--green)' : 'var(--terracota)';
+
+  renderTetoParcelas();
 
   // --- Faixa de KPIs (desktop) ---
   const saldoTotalContas = contas.reduce((s,c)=> s + (c.saldo||0), 0);
@@ -4559,6 +4576,169 @@ function renderProjecaoFluxoCaixa(){
   }).join('');
 }
 
+
+// ---------- Teto de parcelas (10% da receita do mês) — só AVISA, nunca bloqueia ----------
+const TETO_PARCELAS_PCT = 0.10;
+
+function receitaDoMes(chave){
+  return entradas.filter(en => (en.data||'').startsWith(chave)).reduce((s,en)=> s + (en.valor||0), 0);
+}
+function deslocamentoMeses(chave){
+  const hoje = new Date();
+  const [a,m] = chave.split('-').map(Number);
+  return (a - hoje.getFullYear())*12 + ((m-1) - hoje.getMonth());
+}
+// Teto do mês; se o mês ainda não tem receita lançada, usa a do mês atual como referência
+function tetoParcelasDoMes(chave){
+  let rec = receitaDoMes(chave);
+  if (!rec) rec = receitaDoMes(mesChave(new Date()));
+  return rec * TETO_PARCELAS_PCT;
+}
+// Parcelas já existentes num mês, separadas por origem: despesas parceladas, cartão parcelado, parcela de dívidas
+function parcelasDoMes(chave, ignorarDividaId){
+  let contas_ = 0, cartao = 0, divs = 0;
+  despesas.forEach(d => {
+    if ((d.finita || d.parcelaTotal > 1) && (d.vencimento||'').startsWith(chave)) contas_ += d.valor||0;
+  });
+  cartoes.forEach(c => itensDaFaturaPara(c.id, chave).forEach(it => {
+    if (it.parcelaTotal > 1) cartao += it.valor||0;
+  }));
+  const off = deslocamentoMeses(chave);
+  if (off >= 0){
+    dividas.forEach(d => {
+      if (d.quitada || !d.parcelaValor || d.id === ignorarDividaId) return;
+      if (d.parcelaTotal){
+        const restantes = d.parcelaTotal - (d.parcelaAtual||0);
+        if (off < restantes) divs += d.parcelaValor;
+      } else {
+        divs += d.parcelaValor; // sem total informado: não dá pra saber quando acaba, conta todo mês
+      }
+    });
+  }
+  return { contas: contas_, cartao, dividas: divs, total: contas_ + cartao + divs };
+}
+
+function renderTetoParcelas(){
+  const el = document.getElementById('home-teto-parcelas');
+  if (!el) return;
+  const hoje = new Date();
+  const chave0 = mesChave(hoje);
+  const rec0 = receitaDoMes(chave0);
+  const p0 = parcelasDoMes(chave0);
+  const teto0 = rec0 * TETO_PARCELAS_PCT;
+  let html = '';
+  if (!rec0){
+    html += `<div class="muted" style="font-size:13px">Sem receita lançada neste mês — o teto (${Math.round(TETO_PARCELAS_PCT*100)}% da receita) ainda não pode ser calculado.</div>`;
+    html += `<div style="margin-top:6px">Parcelas deste mês: <b class="mono">${brl(p0.total)}</b></div>`;
+  } else {
+    const pct = teto0 > 0 ? (p0.total / teto0) * 100 : 0;
+    const cor = corProgresso(pct);
+    const sobra = teto0 - p0.total;
+    html += `<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">
+      <div><span class="mono" style="font-size:20px;font-weight:700">${brl(p0.total)}</span> <span class="muted" style="font-size:13px">de ${brl(teto0)}</span></div>
+      <div style="font-weight:700;color:${cor}">${Math.round(pct)}%</div></div>`;
+    html += `<div class="barra" style="margin-top:8px"><div class="barra-fill" style="width:${Math.min(100,pct)}%;background:${cor}"></div></div>`;
+    html += `<div class="muted" style="font-size:12.5px;margin-top:6px">${sobra >= 0 ? `Cabem mais ${brl(sobra)} em parcelas novas.` : `Acima do teto em ${brl(-sobra)} — melhor esperar uma parcela acabar.`} · teto = ${Math.round(TETO_PARCELAS_PCT*100)}% da receita (${brl(rec0)})</div>`;
+  }
+  // origem das parcelas do mês
+  const partes = [['Contas', p0.contas], ['Cartão', p0.cartao], ['Dívidas', p0.dividas]].filter(x => x[1] > 0);
+  if (partes.length){
+    html += `<div class="muted" style="font-size:12.5px;margin-top:8px">${partes.map(x => `${x[0]} <span class="mono">${brl(x[1])}</span>`).join(' · ')}</div>`;
+  }
+  // próximos meses
+  let linhas = '';
+  let anterior = p0.total;
+  for (let i = 1; i <= 6; i++){
+    const d = new Date(hoje.getFullYear(), hoje.getMonth()+i, 1);
+    const ch = mesChave(d);
+    const p = parcelasDoMes(ch);
+    const teto = tetoParcelasDoMes(ch);
+    const pct = teto > 0 ? (p.total / teto) * 100 : 0;
+    const libera = anterior - p.total;
+    linhas += `<div class="teto-linha">
+      <span class="teto-mes">${NOMES_MES[d.getMonth()].slice(0,3)}</span>
+      <div class="barra"><div class="barra-fill" style="width:${Math.min(100,pct)}%;background:${corProgresso(pct)}"></div></div>
+      <span class="teto-val mono">${brl(p.total)}</span>
+      <span class="muted" style="min-width:74px;font-size:11.5px">${libera > 0.005 ? '↓ libera '+brl(libera) : ''}</span>
+    </div>`;
+    anterior = p.total;
+  }
+  html += `<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:8px"><div class="muted" style="font-size:12px;margin-bottom:2px">Próximos meses</div>${linhas}</div>`;
+  el.innerHTML = html;
+}
+
+// Texto do aviso dos formulários: "Teto: R$ X, usado: R$ Y, com esta parcela: R$ Z"
+// Confere cada mês da duração da parcela e mostra o pior (ou o primeiro, se nenhum estourar).
+function textoAvisoTeto(valorParcela, chaveInicio, qtdParcelas, ignorarDividaId){
+  if (!(valorParcela > 0) || !chaveInicio) return null;
+  const [a,m] = chaveInicio.split('-').map(Number);
+  let pior = null;
+  const n = Math.min(Math.max(qtdParcelas||1,1), 60);
+  for (let i = 0; i < n; i++){
+    const d = new Date(a, m-1+i, 1);
+    const ch = mesChave(d);
+    if (deslocamentoMeses(ch) < 0) continue;
+    const usado = parcelasDoMes(ch, ignorarDividaId).total;
+    const teto = tetoParcelasDoMes(ch);
+    const com = usado + valorParcela;
+    const estoura = teto > 0 && com > teto;
+    const item = { ch, d, usado, teto, com, estoura };
+    if (!pior || (estoura && !pior.estoura)) pior = item;
+    if (pior.estoura) break;
+  }
+  if (!pior) return null;
+  if (!(pior.teto > 0)) return { over:false, txt:'Sem receita lançada pra calcular o teto de parcelas.' };
+  const mesTxt = NOMES_MES[pior.d.getMonth()].slice(0,3) + '/' + pior.d.getFullYear();
+  return {
+    over: pior.estoura,
+    txt: `${pior.estoura ? '⚠ ' : ''}Teto: ${brl(pior.teto)}, usado: ${brl(pior.usado)}, com esta parcela: ${brl(pior.com)} (${mesTxt})${pior.estoura ? ' — passa do teto, mas você pode salvar mesmo assim.' : ''}`
+  };
+}
+function mostrarAvisoTeto(id, r){
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (!r){ el.style.display = 'none'; return; }
+  el.textContent = r.txt;
+  el.classList.toggle('over', !!r.over);
+  el.style.display = 'block';
+}
+function atualizarAvisosTeto(){
+  try{
+    const ov = id => { const e = document.getElementById(id); return e && e.classList.contains('open'); };
+    if (ov('overlay-despesa')){
+      let r = null;
+      if (!despesaEditandoId && document.getElementById('despesa-parcelada').value === 'sim'){
+        const n = parseInt(document.getElementById('despesa-parcelas-total').value || 0);
+        const v = parseFloat(document.getElementById('despesa-valor').value || 0);
+        const venc = document.getElementById('despesa-vencimento').value;
+        if (n > 1 && venc) r = textoAvisoTeto(v, venc.slice(0,7), n);
+      }
+      mostrarAvisoTeto('aviso-teto-despesa', r);
+    }
+    if (ov('overlay-lancamento')){
+      let r = null;
+      if (!lancamentoEditandoId && document.getElementById('lanc-parcelado').value === 'sim'){
+        const total = parseInt(document.getElementById('lanc-parcela-total').value || 0);
+        const atual = parseInt(document.getElementById('lanc-parcela-atual').value || 1);
+        const v = parseFloat(document.getElementById('lanc-valor').value || 0);
+        const data = document.getElementById('lanc-data').value;
+        const cart = cartoes.find(c => c.id === cartaoAbertoId);
+        if (total > 1 && data && cart) r = textoAvisoTeto(v / total, mesFaturaDe(data, cart), total - atual + 1);
+      }
+      mostrarAvisoTeto('aviso-teto-lanc', r);
+    }
+    if (ov('overlay-divida')){
+      let r = null;
+      const v = parseFloat(document.getElementById('divida-parcela-valor').value || 0);
+      const total = parseInt(document.getElementById('divida-parcela-total').value || 0);
+      const atual = parseInt(document.getElementById('divida-parcela-atual').value || 0);
+      if (v > 0) r = textoAvisoTeto(v, mesChave(new Date()), total ? Math.max(total - atual, 1) : 12, dividaEditandoId);
+      mostrarAvisoTeto('aviso-teto-divida', r);
+    }
+  } catch(e){ console.error('avisoTeto:', e); }
+}
+['input','change','click'].forEach(ev => document.addEventListener(ev, () => setTimeout(atualizarAvisosTeto, 0)));
+
 function renderHome(){
   const hoje = new Date();
   document.getElementById('home-date').textContent = hoje.toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long' }).toUpperCase();
@@ -5059,6 +5239,7 @@ function iniciarListeners(uid){
   unsubscribers.push(onSnapshot(query(collection(db, 'dividas'), where('userId','==',uid)), snap => {
     dividas = snap.docs.map(d => ({ id:d.id, ...d.data() })).sort(porCriadoEmAsc);
     renderDividas();
+    renderTetoParcelas();
   }, err => console.error('dividas:', err)));
 }
 
